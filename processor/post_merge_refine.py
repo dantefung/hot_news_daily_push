@@ -370,11 +370,16 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             output_dir = os.path.join("data", "outputs")
             os.makedirs(output_dir, exist_ok=True)
             for i in range(1, draft_count + 1):
+                # 差异化提示
+                diff_hint = ""
+                if i > 1:
+                    diff_hint = ("\n\n【差异化要求】请用与上一稿明显不同的表达方式、结构或角度重写，"
+                                 "可以适当调整内容顺序、突出不同要点，避免与上一稿重复。风格可更简洁、详细、口语化或学术化等。")
                 output_path = os.path.join(
                     output_dir, f"refined_summary_{timestamp_str}_draft_{i}.md")
                 output_paths.append(output_path)
                 success = self._process_internal(
-                    temp_summary_path, output_path, context.get('summary_model', 'gemini'))
+                    temp_summary_path, output_path, context.get('summary_model', 'gemini'), diff_hint)
                 if success:
                     with open(output_path, 'r', encoding='utf-8') as f:
                         refined_summary = f.read()
@@ -389,7 +394,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             logger.error(f"后置处理失败: {str(e)}")
             return [summary]
 
-    def _process_internal(self, summary_path: str, output_path: str, llm_type: str = "gemini") -> bool:
+    def _process_internal(self, summary_path: str, output_path: str, llm_type: str = "gemini", diff_hint: str = "") -> bool:
         """
         内部处理方法（增强版，包含智能预处理）
 
@@ -397,6 +402,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             summary_path: 本地summary文件路径
             output_path: 输出文件路径
             llm_type: LLM类型
+            diff_hint: 差异化提示
 
         Returns:
             bool: 处理是否成功
@@ -440,9 +446,10 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                     f.write(preprocessed_content)
                 logger.info(f"预处理结果已保存到: {outputs_path}")
 
-                # 5. AI润色（使用预处理后的内容）
+                # 5. AI润色（使用预处理后的内容+差异化提示）
                 logger.info("开始AI润色...")
-                refined_content = self.ai_refine_content(preprocessed_content)
+                refined_content = self.ai_refine_content(
+                    preprocessed_content + diff_hint)
             else:
                 # 使用传统方式
                 logger.info("使用传统方式处理...")
