@@ -120,6 +120,9 @@ jobs:
           # ==========================================
           HUNYUAN_API_KEY: ${{ secrets.HUNYUAN_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BASE_URL: ${{ secrets.BASE_URL }}
+          GEMINI_MODEL_NAME: ${{ secrets.GEMINI_MODEL_NAME }}
+          GEMINI_BASE_URL: ${{ secrets.GEMINI_BASE_URL }}
 
           # ==========================================
           # 必需配置 (Required) - Webhook配置
@@ -160,11 +163,9 @@ jobs:
           # ==========================================
           # 可选配置 (Optional) - API配置
           # ==========================================
-          BASE_URL: ${{ secrets.BASE_URL }}
           DEEPSEEK_API_URL: ${{ secrets.DEEPSEEK_API_URL }}
           DEEPSEEK_MODEL_ID: ${{ secrets.DEEPSEEK_MODEL_ID }}
-          GEMINI_MODEL_NAME: ${{ secrets.GEMINI_MODEL_NAME }}
-          GEMINI_BASE_URL: ${{ secrets.GEMINI_BASE_URL }}
+
 
           # ==========================================
           # 可选配置 (Optional) - RSS配置
