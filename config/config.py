@@ -48,7 +48,7 @@ ERROR_NOTIFICATION_ENABLED = os.getenv(
     'ERROR_NOTIFICATION_ENABLED', 'true').lower() == 'true'
 
 # API配置
-BASE_URL = os.getenv('BASE_URL'， 'https://api-hot.imsyy.top/')
+BASE_URL = os.getenv('BASE_URL', 'https://api-hot.imsyy.top/')
 DEEPSEEK_API_URL = os.getenv('DEEPSEEK_API_URL')
 DEEPSEEK_MODEL_ID = os.getenv('DEEPSEEK_MODEL_ID')
 
