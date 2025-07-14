@@ -3,7 +3,7 @@ name: Daily News Push
 on:
   # 每天上午8点（北京时间）自动触发
   schedule:
-    - cron: "0 0 * * *" # UTC时间0点，对应北京时间8点
+    - cron: "0 20 * * *" # UTC时间20点，对应北京时间凌晨4点
 
   # 手动触发（用于测试）
   workflow_dispatch:
@@ -165,7 +165,6 @@ jobs:
           # ==========================================
           DEEPSEEK_API_URL: ${{ secrets.DEEPSEEK_API_URL }}
           DEEPSEEK_MODEL_ID: ${{ secrets.DEEPSEEK_MODEL_ID }}
-
 
           # ==========================================
           # 可选配置 (Optional) - RSS配置
