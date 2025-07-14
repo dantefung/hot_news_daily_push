@@ -1,0 +1,222 @@
+name: Daily News Push
+
+on:
+  # 每天上午8点（北京时间）自动触发
+  schedule:
+    - cron: "0 0 * * *" # UTC时间0点，对应北京时间8点
+
+  # 手动触发（用于测试）
+  workflow_dispatch:
+    inputs:
+      tech_only:
+        description: "是否只收集科技相关新闻"
+        required: false
+        default: false
+        type: boolean
+      skip_content:
+        description: "是否跳过内容处理"
+        required: false
+        default: false
+        type: boolean
+      summary_model:
+        description: "AI总结模型选择"
+        required: false
+        default: "gemini"
+        type: choice
+        options:
+          - gemini
+          - deepseek
+          - hunyuan
+
+env:
+  # 设置时区为北京时间
+  TZ: Asia/Shanghai
+
+  # 基础配置
+  TECH_ONLY: ${{ github.event.inputs.tech_only || 'false' }}
+  SKIP_CONTENT: ${{ github.event.inputs.skip_content || 'false' }}
+  SUMMARY_MODEL: ${{ github.event.inputs.summary_model || 'gemini' }}
+
+  # 启用后置处理
+  ENABLE_POST_PROCESS: "true"
+  ENABLE_ENHANCED_PROCESSING: "true"
+
+  # 数据收集配置
+  RSS_DAYS: "1"
+  FILTER_DAYS: "1"
+  MAX_WORKERS: "5"
+  TITLE_LENGTH: "20"
+
+  # 缓存配置
+  NO_CACHE: "false"
+
+  # 错误通知配置
+  ERROR_NOTIFICATION_ENABLED: "true"
+
+jobs:
+  daily-news-push:
+    name: Daily News Push Job
+    runs-on: ubuntu-latest
+
+    # 设置超时时间为30分钟
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取完整历史，用于GitHub发布功能
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libxml2-dev \
+            libxslt1-dev \
+            libffi-dev \
+            libssl-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libfreetype6-dev \
+            liblcms2-dev \
+            libwebp-dev \
+            libopenjp2-7-dev \
+            libtiff5-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libxcb1-dev \
+            pkg-config
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create necessary directories
+        run: |
+          mkdir -p data/raw data/filtered data/merged data/inputs data/outputs data/webhook data/debug data/test
+          mkdir -p cache/summary
+
+      - name: Run daily news push
+        env:
+          # ==========================================
+          # 必需配置 (Required) - API密钥配置
+          # ==========================================
+          HUNYUAN_API_KEY: ${{ secrets.HUNYUAN_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          # ==========================================
+          # 必需配置 (Required) - Webhook配置
+          # ==========================================
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+
+          # ==========================================
+          # 必需配置 (Required) - 错误通知配置
+          # ==========================================
+          ERROR_QYWX_KEY: ${{ secrets.ERROR_QYWX_KEY }}
+
+          # ==========================================
+          # 必需配置 (Required) - GitHub发布配置
+          # ==========================================
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO_OWNER: ${{ secrets.GITHUB_REPO_OWNER }}
+          GITHUB_REPO_NAME: ${{ secrets.GITHUB_REPO_NAME }}
+          GITHUB_BRANCH: ${{ secrets.GITHUB_BRANCH }}
+          GITHUB_PATH: ${{ secrets.GITHUB_PATH }}
+
+          # ==========================================
+          # 可选配置 (Optional) - API密钥配置
+          # ==========================================
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+
+          # ==========================================
+          # 可选配置 (Optional) - Webhook配置
+          # ==========================================
+          ERROR_WEBHOOK_URL: ${{ secrets.ERROR_WEBHOOK_URL }}
+
+          # ==========================================
+          # 可选配置 (Optional) - 错误通知配置
+          # ==========================================
+          ERROR_TG_BOT_TOKEN: ${{ secrets.ERROR_TG_BOT_TOKEN }}
+          ERROR_TG_USER_ID: ${{ secrets.ERROR_TG_USER_ID }}
+          QYWX_ORIGIN: ${{ secrets.QYWX_ORIGIN }}
+
+          # ==========================================
+          # 可选配置 (Optional) - API配置
+          # ==========================================
+          BASE_URL: ${{ secrets.BASE_URL }}
+          DEEPSEEK_API_URL: ${{ secrets.DEEPSEEK_API_URL }}
+          DEEPSEEK_MODEL_ID: ${{ secrets.DEEPSEEK_MODEL_ID }}
+          GEMINI_MODEL_NAME: ${{ secrets.GEMINI_MODEL_NAME }}
+          GEMINI_BASE_URL: ${{ secrets.GEMINI_BASE_URL }}
+
+          # ==========================================
+          # 可选配置 (Optional) - RSS配置
+          # ==========================================
+          RSS_URL: ${{ secrets.RSS_URL }}
+
+          # ==========================================
+          # 可选配置 (Optional) - Crawl4AI配置
+          # ==========================================
+          CRAWL4AI_ENABLED: ${{ secrets.CRAWL4AI_ENABLED }}
+          CRAWL4AI_API_URL: ${{ secrets.CRAWL4AI_API_URL }}
+          CRAWL4AI_API_TOKEN: ${{ secrets.CRAWL4AI_API_TOKEN }}
+
+        run: |
+          echo "开始执行每日新闻推送任务..."
+          echo "配置信息："
+          echo "- TECH_ONLY: $TECH_ONLY"
+          echo "- SKIP_CONTENT: $SKIP_CONTENT"
+          echo "- SUMMARY_MODEL: $SUMMARY_MODEL"
+          echo "- ENABLE_POST_PROCESS: $ENABLE_POST_PROCESS"
+          echo "- ENABLE_ENHANCED_PROCESSING: $ENABLE_ENHANCED_PROCESSING"
+          echo "- ERROR_NOTIFICATION_ENABLED: $ERROR_NOTIFICATION_ENABLED"
+
+          # 设置Python路径
+          export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}"
+
+          # 执行主程序
+          python hot_news_main.py
+
+      - name: Upload artifacts on success
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: news-outputs-${{ github.run_id }}
+          path: |
+            data/outputs/
+            data/processed_output/
+            data/debug/
+            data/test/
+          retention-days: 7
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: error-logs-${{ github.run_id }}
+          path: |
+            data/
+            cache/
+          retention-days: 30
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "任务执行失败，请检查日志和配置"
+          # 这里可以添加失败通知逻辑，比如发送邮件或webhook通知

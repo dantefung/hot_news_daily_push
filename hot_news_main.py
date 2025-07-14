@@ -289,8 +289,8 @@ def safe_main():
         # 移除多余的空格和常见的标点符号
         import re
         normalized = re.sub(r'\s+', ' ', title.strip())  # 统一空格
-        normalized = re.sub(r'[，。！？：；""''「」（）()【】\[\]…—]',
-                            '', normalized)  # 移除标点符号
+        normalized = re.sub(
+            r'[，。！？：；""\'「」（）()【】\\[\\]…—]', '', normalized)  # 移除标点符号
         return normalized.lower()
 
     def titles_are_similar(title1, title2, min_prefix_length=30):

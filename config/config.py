@@ -32,8 +32,9 @@ CRAWL4AI_MAX_RETRIES = int(os.getenv('CRAWL4AI_MAX_RETRIES', '2'))
 
 # 总结模型选择 (支持: deepseek, gemini)
 SUMMARY_MODEL = os.getenv('SUMMARY_MODEL', 'gemini')
-GEMINI_MODEL_NAME = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.0-flash-exp')
-GEMINI_BASE_URL = os.getenv('GEMINI_BASE_URL', 'https://gemini.kbz.ink')
+GEMINI_MODEL_NAME = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.0-flash')
+# https://generativelanguage.googleapis.com
+GEMINI_BASE_URL = os.getenv('GEMINI_BASE_URL', 'https://api-proxy.me/gemini')
 
 # Webhook URL
 WEBHOOK_URL = os.getenv('WEBHOOK_URL')
@@ -47,13 +48,12 @@ ERROR_NOTIFICATION_ENABLED = os.getenv(
     'ERROR_NOTIFICATION_ENABLED', 'true').lower() == 'true'
 
 # API配置
-BASE_URL = os.getenv('BASE_URL')
+BASE_URL = os.getenv('BASE_URL'， 'https://api-hot.imsyy.top/')
 DEEPSEEK_API_URL = os.getenv('DEEPSEEK_API_URL')
 DEEPSEEK_MODEL_ID = os.getenv('DEEPSEEK_MODEL_ID')
 
 # RSS配置
-RSS_URL = os.getenv('RSS_URL')
-print(os.getenv('RSS_DAYS'))
+RSS_URL = os.getenv('RSS_URL', 'https://sanhua.himrr.com/daily-news/feed')
 RSS_DAYS = int(os.getenv('RSS_DAYS', '1'))
 
 # RSS源列表

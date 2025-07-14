@@ -187,6 +187,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 保持内容的时效性
 - 确保信息的准确性和可靠性
 
+### 6. 摘要换行要求
+- **请特别注意：AI内容摘要（即“AI内容摘要”代码块内的内容）如果过长，请自动合理换行，建议每行不超过40个中文字符，英文不强制换行。**
+
 ## 输出格式要求：
 **请直接输出以下格式的markdown内容，不要添加任何其他文字：**
 
@@ -237,13 +240,12 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 5. 格式完全符合上述模板
 6. **直接输出markdown内容，不要添加任何确认语句或解释**
 """
-
-            # 保存prompt到data/test目录
+            # 保存prompt到data/outputs目录
             import os
             from datetime import datetime
-            os.makedirs("data/test", exist_ok=True)
+            os.makedirs("data/outputs", exist_ok=True)
             timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            prompt_path = f"data/test/llm_prompt_{timestamp_str}.txt"
+            prompt_path = f"data/outputs/llm_prompt_{timestamp_str}.txt"
             with open(prompt_path, 'w', encoding='utf-8') as f:
                 f.write(prompt)
             logger.info(f"已保存大模型请求prompt到: {prompt_path}")
@@ -252,9 +254,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             refined_content = self.llm_integration.refine_markdown(prompt)
             logger.info("AI润色完成")
 
-            # 保存响应到data/test目录
-            response_path = f"data/test/llm_response_{timestamp_str}.md"
-            print("保存响应到data/test目录", response_path)
+            # 保存响应到data/outputs目录
+            response_path = f"data/outputs/llm_response_{timestamp_str}.md"
+            print("保存响应到data/outputs目录", response_path)
             with open(response_path, 'w', encoding='utf-8') as f:
                 f.write(refined_content)
             logger.info(f"已保存大模型响应到: {response_path}")
@@ -328,7 +330,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             bool: 保存是否成功
         """
         try:
-            # 确保输出目录存在
+            # 直接保存，不再本地换行
             output_dir = os.path.dirname(output_path)
             if output_dir:
                 os.makedirs(output_dir, exist_ok=True)
@@ -429,14 +431,14 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                     merged_content)
 
                 # 保存预处理结果用于调试
-                debug_dir = os.path.join("data", "debug")
-                os.makedirs(debug_dir, exist_ok=True)
+                outputs_dir = os.path.join("data", "outputs")
+                os.makedirs(outputs_dir, exist_ok=True)
                 timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                debug_path = os.path.join(
-                    debug_dir, f"preprocessed_{timestamp_str}.md")
-                with open(debug_path, 'w', encoding='utf-8') as f:
+                outputs_path = os.path.join(
+                    outputs_dir, f"preprocessed_{timestamp_str}.md")
+                with open(outputs_path, 'w', encoding='utf-8') as f:
                     f.write(preprocessed_content)
-                logger.info(f"预处理结果已保存到: {debug_path}")
+                logger.info(f"预处理结果已保存到: {outputs_path}")
 
                 # 5. AI润色（使用预处理后的内容）
                 logger.info("开始AI润色...")
