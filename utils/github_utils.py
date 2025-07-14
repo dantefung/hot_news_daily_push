@@ -306,27 +306,25 @@ class GitHubUtils:
         """
         try:
             date_str = datetime.now().strftime('%Y-%m-%d')
-            summaries = [summary]
-            if context and 'refined_summaries' in context and isinstance(context['refined_summaries'], list):
-                summaries = context['refined_summaries']
-            all_success = True
-            for idx, summ in enumerate(summaries, 1):
-                # 构建文件路径，增加_release后缀和编号
-                file_path = f"daily/{date_str}_release_{idx}.md"
-                file_content = self._create_summary_content(
-                    summ, context, date_str)
-                existing_sha = self.get_file_sha(file_path)
-                commit_message = f"📰 科技日报更新 - {date_str} (稿件{idx})"
-                if existing_sha:
-                    logger.info(f"更新已存在的文件: {file_path}")
-                    self.create_or_update_file(
-                        file_path, file_content, commit_message, existing_sha)
-                else:
-                    logger.info(f"创建新文件: {file_path}")
-                    self.create_or_update_file(
-                        file_path, file_content, commit_message)
-                logger.info(f"✅ 成功发布到GitHub: {file_path}")
-            return all_success
+            idx = 1
+            if context and 'release_idx' in context:
+                idx = context['release_idx']
+            # 构建文件路径，增加_release后缀和编号
+            file_path = f"daily/{date_str}_release_{idx}.md"
+            file_content = self._create_summary_content(
+                summary, context, date_str)
+            existing_sha = self.get_file_sha(file_path)
+            commit_message = f"📰 科技日报更新 - {date_str} (稿件{idx})"
+            if existing_sha:
+                logger.info(f"更新已存在的文件: {file_path}")
+                self.create_or_update_file(
+                    file_path, file_content, commit_message, existing_sha)
+            else:
+                logger.info(f"创建新文件: {file_path}")
+                self.create_or_update_file(
+                    file_path, file_content, commit_message)
+            logger.info(f"✅ 成功发布到GitHub: {file_path}")
+            return True
         except Exception as e:
             logger.error(f"发布到GitHub失败: {str(e)}")
             return False
