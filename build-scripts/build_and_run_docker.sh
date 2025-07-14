@@ -4,6 +4,7 @@
 IMAGE_NAME="hot-news-daily-push:latest"
 
 echo "\n==> 构建 Docker 镜像: $IMAGE_NAME"
+cd ..
 docker build -t $IMAGE_NAME .
 
 # 检查.env文件
