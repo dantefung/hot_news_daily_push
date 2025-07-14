@@ -57,6 +57,7 @@ jobs:
   daily-news-push:
     name: Daily News Push Job
     runs-on: ubuntu-latest
+    environment: Daily_News
 
     # 设置超时时间为30分钟
     timeout-minutes: 30
@@ -133,11 +134,11 @@ jobs:
           # ==========================================
           # 必需配置 (Required) - GitHub发布配置
           # ==========================================
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPO_OWNER: ${{ secrets.GITHUB_REPO_OWNER }}
-          GITHUB_REPO_NAME: ${{ secrets.GITHUB_REPO_NAME }}
-          GITHUB_BRANCH: ${{ secrets.GITHUB_BRANCH }}
-          GITHUB_PATH: ${{ secrets.GITHUB_PATH }}
+          GITHUB_TOKEN: ${{ secrets.ARTICLES_GITHUB_TOKEN }}
+          GITHUB_REPO_OWNER: ${{ secrets.ARTICLES_GITHUB_REPO_OWNER }}
+          GITHUB_REPO_NAME: ${{ secrets.ARTICLES_GITHUB_REPO_NAME }}
+          GITHUB_BRANCH: ${{ secrets.ARTICLES_GITHUB_BRANCH }}
+          GITHUB_PATH: ${{ secrets.ARTICLES_GITHUB_PATH }}
 
           # ==========================================
           # 可选配置 (Optional) - API密钥配置
