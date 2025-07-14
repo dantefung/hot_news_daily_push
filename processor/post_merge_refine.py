@@ -346,7 +346,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             logger.error(f"保存润色内容失败: {output_path}，错误: {e}")
             return False
 
-    def process(self, summary: str, context: Dict[str, Any]) -> List[str]:
+    def process(self, summary: str, context: Dict[str, Any]) -> str:
         """
         处理摘要内容（符合PostProcessorInterface接口）
 
@@ -355,7 +355,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             context: 处理上下文
 
         Returns:
-            List[str]: 处理后的摘要内容列表
+            str: 处理后的摘要内容（主推送用第一份）
         """
         try:
             import tempfile
@@ -370,7 +370,6 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             output_dir = os.path.join("data", "outputs")
             os.makedirs(output_dir, exist_ok=True)
             for i in range(1, draft_count + 1):
-                # 差异化提示
                 diff_hint = ""
                 if i > 1:
                     diff_hint = ("\n\n【差异化要求】请用与上一稿明显不同的表达方式、结构或角度重写，"
@@ -389,10 +388,13 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                 else:
                     logger.warning(f"后置处理失败（draft {i}），返回原始summary")
                     refined_summaries.append(summary)
-            return refined_summaries
+            # 写入 context
+            context['refined_summaries'] = refined_summaries
+            # 返回第一份（主推送用）
+            return refined_summaries[0] if refined_summaries else summary
         except Exception as e:
             logger.error(f"后置处理失败: {str(e)}")
-            return [summary]
+            return summary
 
     def _process_internal(self, summary_path: str, output_path: str, llm_type: str = "gemini", diff_hint: str = "") -> bool:
         """
