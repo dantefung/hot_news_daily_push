@@ -42,6 +42,23 @@
     - **多模型支持**：支持 DeepSeek 和 Google Gemini 两种总结模型，可通过环境变量切换。
     - 使用所选AI模型对去重和处理后的信息列表进行最终归纳总结。
     - **优化Prompt**：指导AI模型理解包含社交媒体信息，并合并内容相似的条目。
+- **后置处理功能**：
+    - **远程内容融合**：自动下载并融合来自其他项目的科技日报内容（如CloudFlare-AI-Insight-Daily、daily-tech-articles等）
+    - **AI去重润色**：使用配置的AI模型对融合后的内容进行去重、合并和润色
+    - **可配置开关**：通过 `ENABLE_POST_PROCESS` 环境变量控制是否启用后置处理
+    - **智能回退**：后置处理失败时自动回退到原始总结内容，不影响主流程
+- **扩展点系统**：
+    - **插件式架构**：提供 `PostProcessorInterface` 接口，支持用户自定义后置处理逻辑
+    - **优先级管理**：支持处理器优先级设置，确保处理顺序可控
+    - **上下文传递**：处理上下文包含配置、数据等信息，便于处理器决策
+    - **容错机制**：单个处理器失败不影响其他处理器执行
+    - **热插拔**：支持运行时注册和启用/禁用处理器
+- **GitHub推送功能**：
+    - **自动推送**：将处理后的摘要自动推送到GitHub仓库
+    - **文件管理**：支持按日期时间创建文件，自动处理文件冲突
+    - **元数据记录**：包含生成时间、模型信息、内容统计等元数据
+    - **配置灵活**：支持自定义仓库、分支、路径等配置
+    - **智能更新**：自动检测文件是否存在，支持更新已存在的文件
 - **多渠道推送**：支持9种不同的推送渠道，包括企业微信、钉钉、飞书、Telegram等。
     - **备选推送**: 若所有配置的渠道推送失败，会尝试使用 `.env` 中配置的 `WEBHOOK_URL` 进行推送。
     - **智能长度控制**: 修复了webhook推送的UTF-8字节长度限制问题，正确计算中文字符的字节长度（每个汉字3字节），确保内容不超过4096字节限制，避免推送失败。
@@ -88,8 +105,15 @@
 │   ├── webhook_sender.py  # Webhook推送实现 (包括多种渠道)
 │   └── __init__.py
 ├── processor/          # 数据处理模块
-│   └── news_processor.py  # 新闻/信息处理 (网页抓取、时间戳提取、摘要生成/截断、缓存)
-│   └── __init__.py
+│   ├── news_processor.py  # 新闻/信息处理 (网页抓取、时间戳提取、摘要生成/截断、缓存)
+│   ├── post_merge_refine.py  # 后置处理组件 (远程内容融合、AI润色)
+│   ├── github_publisher.py   # GitHub推送处理器 (自动推送到GitHub仓库)
+│   └── __init__.py     # 扩展点接口定义和处理器管理
+├── examples/           # 示例代码目录
+│   ├── github_utils_example.py  # GitHub工具使用示例
+│   ├── post_processor_example.py # 后置处理使用示例
+│   ├── custom_post_processor.py # 自定义后置处理器示例
+│   └── github_publisher_example.py # GitHub推送功能示例
 ── tests/              # 测试代码目录
 │   ├── test_all_news_sources.py       # 测试所有配置的热点API源和RSS源的数据收集和处理流程
 │   ├── test_deepseek_timeout.py       # 测试Deepseek AI API的超时和重试机制
@@ -102,6 +126,8 @@
 │   ├── test_web_crawler.py            # 测试网页内容和时间戳提取功能
 │   ├── test_webhook_detailed.py       # 详细测试所有推送渠道
 │   ├── test_wechat_article.py         # 测试微信公众号文章内容提取
+│   ├── test_extension_system.py       # 扩展点系统测试
+│   ├── test_github_publisher.py       # GitHub推送功能测试
 │   └── __init__.py                    # 测试包初始化文件
 ├── utils/              # 工具函数模块
 │   └── utils.py        # 通用工具函数 (文件保存、清理等)
@@ -177,6 +203,16 @@ ERROR_QYWX_KEY="your_error_qywx_key"  # 专门用于错误通知的企业微信�
 # ERROR_TG_BOT_TOKEN="your_error_tg_bot_token"
 # ERROR_TG_USER_ID="your_telegram_user_id"
 # ERROR_WEBHOOK_URL="your_error_webhook_url"
+
+# --- 后置处理配置 (可选) ---
+ENABLE_POST_PROCESS="true"            # 启用/禁用后置处理功能（融合远程内容并AI润色）
+
+# --- GitHub推送配置 (可选) ---
+GITHUB_TOKEN="your_github_token"      # GitHub个人访问令牌
+GITHUB_REPO_OWNER="your_username"     # GitHub仓库所有者
+GITHUB_REPO_NAME="your_repo_name"     # GitHub仓库名称
+GITHUB_BRANCH="main"                  # 推送分支名称
+GITHUB_PATH="daily"                   # 文件保存路径
 ```
 
 ### 4. (可选) 配置RSS源
@@ -200,6 +236,71 @@ RSS_FEEDS = [\n    {\"name\": \"科技博客A\", \"url\": \"https://example.com/
 ```bash
 python hot_news_main.py
 ```
+
+### 使用扩展点系统
+
+系统提供了插件式的扩展点系统，允许用户自定义后置处理逻辑。
+
+#### 1. 实现自定义处理器
+
+创建一个新的Python文件，实现 `PostProcessorInterface` 接口：
+
+```python
+from processor import PostProcessorInterface
+from typing import Dict, Any
+
+class MyCustomProcessor(PostProcessorInterface):
+    def get_name(self) -> str:
+        return "MyCustomProcessor"
+    
+    def get_priority(self) -> int:
+        return 50  # 优先级，数字越小优先级越高
+    
+    def is_enabled(self, context: Dict[str, Any]) -> bool:
+        return context.get('enable_my_processor', True)
+    
+    def process(self, summary: str, context: Dict[str, Any]) -> str:
+        # 你的自定义处理逻辑
+        processed_summary = summary + "\n\n---\n*自定义处理完成*"
+        return processed_summary
+```
+
+#### 2. 注册处理器
+
+在主程序开始前注册你的处理器：
+
+```python
+from processor import register_post_processor
+from my_custom_processor import MyCustomProcessor
+
+# 注册处理器
+custom_processor = MyCustomProcessor()
+register_post_processor(custom_processor)
+```
+
+#### 3. 控制处理器启用
+
+通过环境变量或上下文控制处理器是否启用：
+
+```bash
+# 在 .env 文件中
+ENABLE_MY_PROCESSOR=true
+```
+
+或在代码中：
+
+```python
+context = {
+    'enable_my_processor': True,
+    # 其他配置...
+}
+```
+
+#### 4. 查看示例
+
+参考 `examples/custom_post_processor.py` 文件，了解完整的实现示例。
+
+## 环境变量配置
 
 程序将执行以下主要步骤：
 1.  **收集数据**: 获取热榜、RSS源内容（尝试预提取内容）、获取近2天的Twitter Feed。
@@ -257,54 +358,54 @@ python hot_news_main.py
 
 ### 基础配置
 
-| 变量名 | 说明 | 默认值 (来自config.py) |
-|-------|------|-------|
-| `TECH_ONLY` | 是否只处理科技热点 (影响热榜源选择、摘要判断和Deepseek总结Prompt) | `False` |
-| `NO_CACHE` | 是否禁用腾讯混元摘要缓存 | `False` |
-| `SKIP_CONTENT` | 是否跳过内容处理步骤(抓取原文、生成/截断摘要)。设为True可加速，但摘要质量可能下降，且无需`HUNYUAN_API_KEY`。 | `False` |
-| `BASE_URL` | 热点数据API基础URL (hotApi项目) | `https://api-hot.imsyy.top` |
-| `MAX_WORKERS` | 内容处理（网页抓取、混元API调用）时的最大并发线程数 | `5` |
-| `FILTER_DAYS` | 过滤多少天内的热榜内容 | `1` |
-| `RSS_DAYS` | 获取RSS中最近几天的文章 (默认与`FILTER_DAYS`一致) | `1` |
-| `HOTSPOT_LIMIT` | 每个热榜来源获取的热点数量限制 | `1` |
+| 变量名          | 说明                                                                                                         | 默认值 (来自config.py)      |
+| --------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| `TECH_ONLY`     | 是否只处理科技热点 (影响热榜源选择、摘要判断和Deepseek总结Prompt)                                            | `False`                     |
+| `NO_CACHE`      | 是否禁用腾讯混元摘要缓存                                                                                     | `False`                     |
+| `SKIP_CONTENT`  | 是否跳过内容处理步骤(抓取原文、生成/截断摘要)。设为True可加速，但摘要质量可能下降，且无需`HUNYUAN_API_KEY`。 | `False`                     |
+| `BASE_URL`      | 热点数据API基础URL (hotApi项目)                                                                              | `https://api-hot.imsyy.top` |
+| `MAX_WORKERS`   | 内容处理（网页抓取、混元API调用）时的最大并发线程数                                                          | `5`                         |
+| `FILTER_DAYS`   | 过滤多少天内的热榜内容                                                                                       | `1`                         |
+| `RSS_DAYS`      | 获取RSS中最近几天的文章 (默认与`FILTER_DAYS`一致)                                                            | `1`                         |
+| `HOTSPOT_LIMIT` | 每个热榜来源获取的热点数量限制                                                                               | `1`                         |
 
 ### RSS配置
 
-| 变量名 | 说明 | 默认值 (来自config.py) |
-|-------|------|-------|
-| `RSS_URL` | 单个RSS源URL (**仅在 `config.py` 中 `RSS_FEEDS` 列表为空时生效**) | `None` |
-| `RSS_FEEDS` | 在 `config/config.py` 中配置，包含名称和URL的字典列表 | `[]` (空列表) |
+| 变量名      | 说明                                                              | 默认值 (来自config.py) |
+| ----------- | ----------------------------------------------------------------- | ---------------------- |
+| `RSS_URL`   | 单个RSS源URL (**仅在 `config.py` 中 `RSS_FEEDS` 列表为空时生效**) | `None`                 |
+| `RSS_FEEDS` | 在 `config/config.py` 中配置，包含名称和URL的字典列表             | `[]` (空列表)          |
 
 ### AI模型配置
 
-| 变量名 | 说明 | 默认值 | 是否必需 |
-|-------|------|-------|--------|
-| `SUMMARY_MODEL` | 总结模型选择 (deepseek 或 gemini) | `deepseek` | 否 |
+| 变量名          | 说明                              | 默认值     | 是否必需 |
+| --------------- | --------------------------------- | ---------- | -------- |
+| `SUMMARY_MODEL` | 总结模型选择 (deepseek 或 gemini) | `deepseek` | 否       |
 
 ### API密钥配置
 
-| 变量名 | 说明 | 是否必需 |
-|-------|------|--------|
-| `DEEPSEEK_API_KEY` | DeepSeek AI API密钥 | **是** (当`SUMMARY_MODEL=deepseek`时) |
-| `DEEPSEEK_API_URL` | DeepSeek API接口地址 (可选，覆盖默认) | 否 |
-| `DEEPSEEK_MODEL_ID` | DeepSeek模型ID (可选，覆盖默认) | 否 |
-| `GEMINI_API_KEY` | Google Gemini API密钥 | **是** (当`SUMMARY_MODEL=gemini`时) |
-| `GEMINI_BASE_URL` | Gemini API代理端点URL | 否 |
-| `GEMINI_MODEL_NAME` | Gemini模型名称 | 否 |
-| `HUNYUAN_API_KEY` | 腾讯混元大模型API密钥 | **是** (除非`SKIP_CONTENT=True`) |
+| 变量名              | 说明                                  | 是否必需                              |
+| ------------------- | ------------------------------------- | ------------------------------------- |
+| `DEEPSEEK_API_KEY`  | DeepSeek AI API密钥                   | **是** (当`SUMMARY_MODEL=deepseek`时) |
+| `DEEPSEEK_API_URL`  | DeepSeek API接口地址 (可选，覆盖默认) | 否                                    |
+| `DEEPSEEK_MODEL_ID` | DeepSeek模型ID (可选，覆盖默认)       | 否                                    |
+| `GEMINI_API_KEY`    | Google Gemini API密钥                 | **是** (当`SUMMARY_MODEL=gemini`时)   |
+| `GEMINI_BASE_URL`   | Gemini API代理端点URL                 | 否                                    |
+| `GEMINI_MODEL_NAME` | Gemini模型名称                        | 否                                    |
+| `HUNYUAN_API_KEY`   | 腾讯混元大模型API密钥                 | **是** (除非`SKIP_CONTENT=True`)      |
 
 ### 推送渠道配置
 
 (请参考 `.env.example` 获取所有支持的渠道和变量名。至少配置一种渠道，或配置下面的`WEBHOOK_URL`作为备选。)
 
-| 变量名 (部分示例) | 说明 | 配置示例 |
-|-------|------|--------|
-| `QYWX_KEY` | 企业微信机器人key | `693axxx-xxxx-xxxx-xxxx-xxxxx` |
-| `DD_BOT_TOKEN` & `DD_BOT_SECRET` | 钉钉机器人Token和Secret | `xxxxxxxx` & `SECxxxxxxxx` |
-| `FSKEY` | 飞书机器人Key | `xxxxxxxxxxxxxxxx` |
-| `TG_BOT_TOKEN` & `TG_USER_ID` | Telegram机器人Token和用户ID | `123:...` & `123456` |
-| ... | 其他渠道 | ... |
-| `WEBHOOK_URL` | 通用Webhook URL (可作为推送失败时的备选方案) | `https://hook.example.com/...` |
+| 变量名 (部分示例)                | 说明                                         | 配置示例                       |
+| -------------------------------- | -------------------------------------------- | ------------------------------ |
+| `QYWX_KEY`                       | 企业微信机器人key                            | `693axxx-xxxx-xxxx-xxxx-xxxxx` |
+| `DD_BOT_TOKEN` & `DD_BOT_SECRET` | 钉钉机器人Token和Secret                      | `xxxxxxxx` & `SECxxxxxxxx`     |
+| `FSKEY`                          | 飞书机器人Key                                | `xxxxxxxxxxxxxxxx`             |
+| `TG_BOT_TOKEN` & `TG_USER_ID`    | Telegram机器人Token和用户ID                  | `123:...` & `123456`           |
+| ...                              | 其他渠道                                     | ...                            |
+| `WEBHOOK_URL`                    | 通用Webhook URL (可作为推送失败时的备选方案) | `https://hook.example.com/...` |
 
 ## 常见问题
 

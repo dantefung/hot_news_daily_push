@@ -14,7 +14,7 @@ from distutils.util import strtobool
 
 # 导入配置
 from config.config import (
-    TECH_SOURCES, ALL_SOURCES, WEBHOOK_URL, DEEPSEEK_API_KEY, 
+    TECH_SOURCES, ALL_SOURCES, WEBHOOK_URL, DEEPSEEK_API_KEY,
     HUNYUAN_API_KEY, GEMINI_API_KEY, SUMMARY_MODEL, GEMINI_MODEL_NAME, GEMINI_BASE_URL,
     BASE_URL, DEEPSEEK_API_URL, DEEPSEEK_MODEL_ID,
     RSS_URL, RSS_DAYS, TITLE_LENGTH, MAX_WORKERS, FILTER_DAYS, RSS_FEEDS
@@ -31,6 +31,9 @@ from crawler.data_collector import (
 
 # 导入处理模块
 from processor.news_processor import process_hotspot_with_summary
+from processor import process_summary_with_plugins, register_post_processor
+from processor.post_merge_refine import PostMergeRefineProcessor
+from processor.github_publisher import create_github_publisher
 
 # 导入LLM集成模块
 from llm_integration.deepseek_integration import summarize_with_deepseek
@@ -46,6 +49,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
 
 def safe_main():
     """
@@ -71,13 +75,15 @@ def safe_main():
     max_workers = int(os.getenv('MAX_WORKERS', str(MAX_WORKERS)))
     skip_content = bool(strtobool(os.getenv('SKIP_CONTENT', 'False')))
     filter_days = int(os.getenv('FILTER_DAYS', str(FILTER_DAYS)))
-    
+    enable_post_process = bool(
+        strtobool(os.getenv('ENABLE_POST_PROCESS', 'True')))
+
     # 检查必要的API密钥和配置
     config_errors = []
-    
+
     if not webhook:
         config_errors.append("未提供Webhook URL")
-    
+
     # 根据选择的总结模型检查相应的API密钥
     if summary_model == 'gemini':
         if not gemini_key:
@@ -91,10 +97,10 @@ def safe_main():
             logger.info("使用DeepSeek模型进行总结")
     else:
         config_errors.append(f"不支持的总结模型: {summary_model}")
-    
+
     if not hunyuan_key and not skip_content:
         config_errors.append("未提供腾讯混元 API Key且未跳过内容处理")
-    
+
     # 如果有配置错误，发送错误通知并退出
     if config_errors:
         error_details = {
@@ -117,7 +123,7 @@ def safe_main():
         )
         logger.error("配置错误，程序退出")
         sys.exit(1)
-    
+
     # 检查 BASE_URL 是否可访问
     try:
         if not check_base_url(base_url):
@@ -137,62 +143,79 @@ def safe_main():
             "网络检查"
         )
         sys.exit(1)
-    
+
     # 根据参数选择信息源
     sources = TECH_SOURCES if tech_only else ALL_SOURCES
-    
+
+    # 注册后置处理器
+    # 从环境变量读取是否启用增强处理
+    enable_enhanced_processing = bool(
+        strtobool(os.getenv('ENABLE_ENHANCED_PROCESSING', 'True')))
+    post_processor = PostMergeRefineProcessor(
+        enable_enhanced_processing=enable_enhanced_processing)
+    register_post_processor(post_processor)
+
+    # 注册GitHub推送处理器
+    github_publisher = create_github_publisher()
+    register_post_processor(github_publisher)
+
     # 收集热点
     hotspots = collect_all_hotspots(sources, base_url)
-    
+
     if not hotspots:
         logger.warning("未能收集到任何热点数据，将继续尝试其他来源...")
-        hotspots = [] # 确保 hotspots 是列表
-    
+        hotspots = []  # 确保 hotspots 是列表
+
     # 保存原始热点数据
     if hotspots:
-        save_hotspots_to_jsonl(hotspots, directory=os.path.join("data", "raw")) # 指定 raw 目录
-    
+        save_hotspots_to_jsonl(
+            hotspots, directory=os.path.join("data", "raw"))  # 指定 raw 目录
+
     # 筛选最近的热点
     hotspots = filter_recent_hotspots(hotspots, filter_days)
-    
+
     # 保存筛选后的热点数据
     if hotspots:
-        save_hotspots_to_jsonl(hotspots, directory=os.path.join("data", "filtered"))
-    
+        save_hotspots_to_jsonl(
+            hotspots, directory=os.path.join("data", "filtered"))
+
     # 获取RSS文章
     # 优先使用RSS_FEEDS列表，如果为空则使用单个RSS_URL
-    rss_articles = fetch_rss_articles(rss_url=rss_url, days=rss_days, rss_feeds=RSS_FEEDS)
-    
+    rss_articles = fetch_rss_articles(
+        rss_url=rss_url, days=rss_days, rss_feeds=RSS_FEEDS)
+
     # --- 新增：获取 Twitter Feed ---
-    twitter_feed_raw = fetch_twitter_feed(days_to_fetch=2) # 获取最近2天
-    
+    twitter_feed_raw = fetch_twitter_feed(days_to_fetch=2)  # 获取最近2天
+
     # 过滤推文，只保留最近1天 (24小时) 的
     recent_tweets = []
     cutoff_time_tweets = datetime.now() - timedelta(days=1)
     if twitter_feed_raw:
         logger.info(f"开始过滤最近24小时的推文 (截止时间: {cutoff_time_tweets})...")
         for tweet in twitter_feed_raw:
-            if tweet.get("timestamp"): # 确保有时间戳
+            if tweet.get("timestamp"):  # 确保有时间戳
                 # Ensure timestamp is treated correctly (it's already in milliseconds from fetch_twitter_feed)
                 tweet_time_ms = tweet["timestamp"]
                 if isinstance(tweet_time_ms, (int, float)):
-                   tweet_time = datetime.fromtimestamp(tweet_time_ms / 1000)
-                   if tweet_time >= cutoff_time_tweets:
-                       recent_tweets.append(tweet)
-                   # else: # 可以取消注释以查看被丢弃的推文
-                   #     logger.debug(f"丢弃较早的推文: {tweet['title']} @ {tweet_time}")
+                    tweet_time = datetime.fromtimestamp(tweet_time_ms / 1000)
+                    if tweet_time >= cutoff_time_tweets:
+                        recent_tweets.append(tweet)
+                    # else: # 可以取消注释以查看被丢弃的推文
+                    #     logger.debug(f"丢弃较早的推文: {tweet['title']} @ {tweet_time}")
                 else:
-                   logger.warning(f"推文时间戳格式不正确: {tweet_time_ms}, 类型: {type(tweet_time_ms)}, 跳过推文: {tweet.get('title')}")
+                    logger.warning(
+                        f"推文时间戳格式不正确: {tweet_time_ms}, 类型: {type(tweet_time_ms)}, 跳过推文: {tweet.get('title')}")
 
             else:
-                 logger.warning(f"推文缺少时间戳，无法过滤: {tweet.get('title')}")
-                 # Decide whether to include tweets without timestamps or skip them
-                 # For now, we skip them to ensure only recent ones are included
-                 # recent_tweets.append(tweet) # Uncomment to include tweets without timestamp
+                logger.warning(f"推文缺少时间戳，无法过滤: {tweet.get('title')}")
+                # Decide whether to include tweets without timestamps or skip them
+                # For now, we skip them to ensure only recent ones are included
+                # recent_tweets.append(tweet) # Uncomment to include tweets without timestamp
 
-        logger.info(f"筛选后保留 {len(recent_tweets)}/{len(twitter_feed_raw)} 条最近24小时的推文。")
+        logger.info(
+            f"筛选后保留 {len(recent_tweets)}/{len(twitter_feed_raw)} 条最近24小时的推文。")
     # --- 结束：获取 Twitter Feed ---
-    
+
     # 给每个数据项添加来源类型标识
     for item in hotspots:
         item['data_source_type'] = 'hotspot'
@@ -200,11 +223,11 @@ def safe_main():
         item['data_source_type'] = 'rss'
     for item in recent_tweets:
         item['data_source_type'] = 'twitter'
-    
+
     # 合并热点、RSS文章和过滤后的推文
-    all_content = hotspots + rss_articles + recent_tweets # 添加 recent_tweets
+    all_content = hotspots + rss_articles + recent_tweets  # 添加 recent_tweets
     logger.info(f"合并后共有 {len(all_content)} 条内容 (包括推文)")
-    
+
     # 检查合并后是否有内容
     if not all_content:
         notify_simple_error(
@@ -214,22 +237,23 @@ def safe_main():
         )
         logger.error("所有来源均未获取到有效内容，程序退出")
         sys.exit(1)
-    
+
     # 保存合并后的数据
-    save_hotspots_to_jsonl(all_content, directory=os.path.join("data", "merged"))
-    
+    save_hotspots_to_jsonl(
+        all_content, directory=os.path.join("data", "merged"))
+
     # 获取网页内容并生成摘要
     if not skip_content:
         try:
             # 确保有事件循环
             if asyncio.get_event_loop().is_closed():
                 asyncio.set_event_loop(asyncio.new_event_loop())
-            
+
             # 使用异步方式处理所有内容，传递tech_only参数和use_cache参数
             loop = asyncio.get_event_loop()
             all_content_with_summary = loop.run_until_complete(
-                process_hotspot_with_summary(all_content, hunyuan_key, max_workers, 
-                                           tech_only, use_cache=not no_cache)
+                process_hotspot_with_summary(all_content, hunyuan_key, max_workers,
+                                             tech_only, use_cache=not no_cache)
             )
             logger.info(f"已为 {len(all_content_with_summary)} 条内容生成摘要")
         except Exception as e:
@@ -245,18 +269,19 @@ def safe_main():
     else:
         all_content_with_summary = all_content
         logger.info("已跳过获取网页内容和生成摘要步骤")
-    
-    # --- 新增：基于标题去重，优先保留 RSS 和 Twitter --- 
-    logger.info(f"开始基于标题去重 (保留RSS/Twitter优先)，处理前数量: {len(all_content_with_summary)}")
+
+    # --- 新增：基于标题去重，优先保留 RSS 和 Twitter ---
+    logger.info(
+        f"开始基于标题去重 (保留RSS/Twitter优先)，处理前数量: {len(all_content_with_summary)}")
     seen_titles = {}
     # 定义优先级：rss > twitter > hotspot
     source_priority = {'rss': 3, 'twitter': 2, 'hotspot': 1}
-    
+
     def get_source_priority(item):
         """获取数据源优先级"""
         data_source_type = item.get('data_source_type', 'unknown')
         return source_priority.get(data_source_type, 0)
-    
+
     def normalize_title(title):
         """标准化标题，用于更好的去重匹配"""
         if not title:
@@ -264,55 +289,56 @@ def safe_main():
         # 移除多余的空格和常见的标点符号
         import re
         normalized = re.sub(r'\s+', ' ', title.strip())  # 统一空格
-        normalized = re.sub(r'[，。！？：；""''「」（）()【】\[\]…—]', '', normalized)  # 移除标点符号
+        normalized = re.sub(r'[，。！？：；""''「」（）()【】\[\]…—]',
+                            '', normalized)  # 移除标点符号
         return normalized.lower()
-    
+
     def titles_are_similar(title1, title2, min_prefix_length=30):
         """判断两个标题是否相似"""
         # 如果完全相同
         if title1 == title2:
             return True
-            
+
         # 标准化后比较
         norm1 = normalize_title(title1)
         norm2 = normalize_title(title2)
-        
+
         if norm1 == norm2:
             return True
-            
+
         # 如果两个标题都足够长，比较前缀
         if len(norm1) >= min_prefix_length and len(norm2) >= min_prefix_length:
             prefix1 = norm1[:min_prefix_length]
             prefix2 = norm2[:min_prefix_length]
             return prefix1 == prefix2
-            
+
         # 对于较短的标题，比较80%的相似度
         if len(norm1) < min_prefix_length or len(norm2) < min_prefix_length:
             shorter_len = min(len(norm1), len(norm2))
             if shorter_len > 10:  # 至少10个字符
                 match_len = int(shorter_len * 0.8)
                 return norm1[:match_len] == norm2[:match_len]
-                
+
         return False
-    
+
     def find_similar_title(title, seen_titles):
         """在已存在的标题中查找相似的标题"""
         for existing_title in seen_titles.keys():
             if titles_are_similar(title, existing_title):
                 return existing_title
         return None
-    
+
     for item in all_content_with_summary:
         title = item.get("title", "").strip()
-        if not title: # 跳过没有标题的条目
+        if not title:  # 跳过没有标题的条目
             continue
-            
+
         current_source = item.get("source", "")
         current_data_source_type = item.get('data_source_type', 'unknown')
-        
+
         # 查找相似的标题
         similar_title = find_similar_title(title, seen_titles)
-        
+
         if similar_title is None:
             # 没有找到相似的标题，直接添加
             seen_titles[title] = item
@@ -320,24 +346,28 @@ def safe_main():
             # 找到相似的标题，进行优先级比较
             existing_item = seen_titles[similar_title]
             existing_source = existing_item.get("source", "")
-            existing_data_source_type = existing_item.get('data_source_type', 'unknown')
-            
+            existing_data_source_type = existing_item.get(
+                'data_source_type', 'unknown')
+
             current_priority = get_source_priority(item)
             existing_priority = get_source_priority(existing_item)
-            
+
             # 如果当前条目优先级更高，则替换
             if current_priority > existing_priority:
-                logger.debug(f"去重：替换相似标题 '{similar_title}' (来自 {existing_data_source_type}:{existing_source}) 为 '{title}' (来自更高优先级 {current_data_source_type}:{current_source})")
+                logger.debug(
+                    f"去重：替换相似标题 '{similar_title}' (来自 {existing_data_source_type}:{existing_source}) 为 '{title}' (来自更高优先级 {current_data_source_type}:{current_source})")
                 # 删除旧的标题，添加新的
                 del seen_titles[similar_title]
                 seen_titles[title] = item
             # 如果优先级相同，保留先遇到的那个
             elif current_priority == existing_priority:
-                logger.debug(f"去重：保留相似标题 '{similar_title}' (来自 {existing_data_source_type}:{existing_source}), 忽略 '{title}' (来自同级 {current_data_source_type}:{current_source})")
+                logger.debug(
+                    f"去重：保留相似标题 '{similar_title}' (来自 {existing_data_source_type}:{existing_source}), 忽略 '{title}' (来自同级 {current_data_source_type}:{current_source})")
             # 如果当前条目优先级较低，保留已存在的
             else:
-                logger.debug(f"去重：保留相似标题 '{similar_title}' (来自高优先级 {existing_data_source_type}:{existing_source}), 忽略 '{title}' (来自低优先级 {current_data_source_type}:{current_source})")
-                
+                logger.debug(
+                    f"去重：保留相似标题 '{similar_title}' (来自高优先级 {existing_data_source_type}:{existing_source}), 忽略 '{title}' (来自低优先级 {current_data_source_type}:{current_source})")
+
     deduplicated_content = list(seen_titles.values())
     logger.info(f"去重后剩余数量: {len(deduplicated_content)}")
     # --- 结束：去重逻辑 ---
@@ -345,39 +375,40 @@ def safe_main():
     # --- 新增：保存最终处理和去重后的新闻列表 ---
     logger.info(f"准备保存处理和去重后的 {len(deduplicated_content)} 条新闻...")
     processed_output_dir = os.path.join("data", "processed_output")
-    os.makedirs(processed_output_dir, exist_ok=True) # 确保目录存在
+    os.makedirs(processed_output_dir, exist_ok=True)  # 确保目录存在
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    processed_filename = os.path.join(processed_output_dir, f"processed_news_{timestamp_str}.json")
-    
+    processed_filename = os.path.join(
+        processed_output_dir, f"processed_news_{timestamp_str}.json")
+
     try:
         # 导入 json 模块（如果尚未导入）
-        import json 
+        import json
         with open(processed_filename, 'w', encoding='utf-8') as f:
             json.dump(deduplicated_content, f, ensure_ascii=False, indent=4)
         logger.info(f"成功将处理后的新闻列表保存到: {processed_filename}")
     except Exception as e:
         logger.error(f"保存处理后的新闻列表到 {processed_filename} 时出错: {str(e)}")
     # --- 结束：保存逻辑 ---
-    
+
     # AI总结阶段
     logger.info("开始AI总结阶段...")
     summary = None
     try:
         if summary_model == 'gemini':
             summary = summarize_with_gemini(deduplicated_content, gemini_key,
-                                           gemini_model_name, gemini_base_url, tech_only=tech_only)
+                                            gemini_model_name, gemini_base_url, tech_only=tech_only)
         else:  # 默认使用 DeepSeek
             summary = summarize_with_deepseek(deduplicated_content, deepseek_key,
-                                             deepseek_url, model_id, tech_only=tech_only)
-        
+                                              deepseek_url, model_id, tech_only=tech_only)
+
         # 检查总结结果是否有效
         # 修改验证逻辑：使用更精确的错误检测，避免误判新闻内容中的关键词
         specific_error_keywords = [
-            "API错误", "API密钥", "地理位置限制", "认证失败", "权限不足", "请求错误", "连接失败", 
+            "API错误", "API密钥", "地理位置限制", "认证失败", "权限不足", "请求错误", "连接失败",
             "解析Gemini返回的JSON失败", "解析DeepSeek返回的JSON失败",
             "模型调用失败", "服务不可用", "配额不足", "请求超时"
         ]
-        
+
         # 检查是否为明显的错误格式（通常错误信息比较简短且直接）
         error_patterns = [
             "失败：",  # 以"失败："开头的错误信息
@@ -385,7 +416,7 @@ def safe_main():
             "Error:",  # 英文错误信息
             "Exception:",  # 异常信息
         ]
-        
+
         is_error_response = False
         if not summary or summary.strip() == "":
             is_error_response = True
@@ -395,7 +426,7 @@ def safe_main():
                 if keyword in summary:
                     is_error_response = True
                     break
-            
+
             # 检查是否符合错误信息的格式模式
             if not is_error_response:
                 summary_lower = summary.lower()
@@ -403,7 +434,7 @@ def safe_main():
                     if pattern.lower() in summary_lower:
                         is_error_response = True
                         break
-            
+
             # 如果总结过短（少于50个字符），可能是错误信息
             if not is_error_response and len(summary.strip()) < 50:
                 # 检查是否包含错误相关词汇且内容很短
@@ -412,10 +443,10 @@ def safe_main():
                     if keyword in summary:
                         is_error_response = True
                         break
-        
+
         if is_error_response:
             raise Exception(f"AI总结返回无效或错误结果: {summary}")
-            
+
     except Exception as e:
         notify_critical_error(
             "AI总结失败",
@@ -429,7 +460,41 @@ def safe_main():
         )
         logger.error(f"AI总结失败: {str(e)}")
         sys.exit(1)
-    
+
+    # 后置处理
+    logger.info("开始后置处理阶段...")
+    if not enable_post_process:
+        logger.info("后置处理已禁用，跳过此步骤")
+    else:
+        try:
+            # 构建处理上下文
+            context = {
+                'enable_post_process': enable_post_process,
+                'summary_model': summary_model,
+                'tech_only': tech_only,
+                'deduplicated_content': deduplicated_content,
+                'timestamp': datetime.now().isoformat()
+            }
+
+            # 使用扩展点系统处理摘要
+            refined_summary = process_summary_with_plugins(summary, context)
+
+            if refined_summary != summary:
+                logger.info(f"后置处理成功，处理后摘要长度: {len(refined_summary)}")
+                summary = refined_summary
+            else:
+                logger.info("后置处理未改变摘要内容")
+
+        except Exception as e:
+            logger.error(f"后置处理失败: {str(e)}")
+            # 后置处理失败不是致命错误，继续使用原始summary
+            notify_simple_error(
+                "后置处理失败",
+                f"后置处理阶段发生错误: {str(e)}",
+                "后置处理"
+            )
+    # --- 结束：后置处理 ---
+
     # 推送阶段
     logger.info("开始推送阶段...")
     try:
@@ -441,9 +506,9 @@ def safe_main():
             fallback_success = send_to_webhook(webhook, summary, tech_only)
             if not fallback_success:
                 raise Exception("所有推送方式（包括备选方案）均失败")
-        
+
         logger.info("✅ 推送成功完成")
-        
+
     except Exception as e:
         notify_critical_error(
             "推送失败",
@@ -457,12 +522,12 @@ def safe_main():
         )
         logger.error(f"推送失败: {str(e)}")
         sys.exit(1)
-    
+
     # 清理阶段
     logger.info("开始清理阶段...")
     try:
         directories_to_clean = [
-            "data/raw", "data/filtered", "data/merged", "data/inputs", 
+            "data/raw", "data/filtered", "data/merged", "data/inputs",
             "data/outputs", "data/webhook", "cache/summary"
         ]
         days_to_keep = 7
@@ -470,7 +535,7 @@ def safe_main():
         for directory in directories_to_clean:
             cleanup_old_files(directory, days_to_keep=days_to_keep)
         logger.info("旧数据清理完成")
-        
+
     except Exception as e:
         # 清理失败不是致命错误，只记录日志
         logger.error(f"清理旧数据时发生错误: {str(e)}")
@@ -479,7 +544,7 @@ def safe_main():
             f"清理旧数据时发生错误: {str(e)}",
             "数据清理"
         )
-    
+
     logger.info("🎉 所有处理步骤完成")
 
 

@@ -8,7 +8,7 @@
 hot_news.py
 
 # 忽略Python缓存文件
-__pycache__/
+__pycache__
 *.py[cod]
 *$py.class
 
@@ -25,5 +25,7 @@ __pycache__/
 *.new
 
 # 忽略 IDE 配置文件 (可选)
-# /.vscode/
-# /.idea/
+.vscode
+.idea
+
+venv

@@ -49,7 +49,8 @@ def summarize_with_tencent_hunyuan(content, api_key, title="", max_retries=3, us
             
             # 创建LLM实例，添加正确的base_url
             llm = ChatOpenAI(
-                model="hunyuan-turbos-latest",  # 使用hunyuan-turboS模型
+                model="hunyuan-lite",  # 使用hunyuan-turboS模型
+                # model="hunyuan-turbos-latest",  # 使用hunyuan-turboS模型
                 temperature=0.3,
                 api_key=api_key,
                 max_tokens=150,

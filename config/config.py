@@ -16,6 +16,13 @@ DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 HUNYUAN_API_KEY = os.getenv('HUNYUAN_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
+# GitHub 配置
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN', '')
+GITHUB_REPO_OWNER = os.getenv('GITHUB_REPO_OWNER', 'dantefung')
+GITHUB_REPO_NAME = os.getenv('GITHUB_REPO_NAME', 'daily-tech-articles')
+GITHUB_BRANCH = os.getenv('GITHUB_BRANCH', 'main')
+GITHUB_PATH = os.getenv('GITHUB_PATH', 'daily')
+
 # Crawl4AI 配置
 CRAWL4AI_ENABLED = os.getenv('CRAWL4AI_ENABLED', 'false').lower() == 'true'
 CRAWL4AI_API_URL = os.getenv('CRAWL4AI_API_URL', 'http://crawl.tuber.cc')
@@ -24,7 +31,7 @@ CRAWL4AI_TIMEOUT = int(os.getenv('CRAWL4AI_TIMEOUT', '20'))
 CRAWL4AI_MAX_RETRIES = int(os.getenv('CRAWL4AI_MAX_RETRIES', '2'))
 
 # 总结模型选择 (支持: deepseek, gemini)
-SUMMARY_MODEL = os.getenv('SUMMARY_MODEL', 'deepseek')
+SUMMARY_MODEL = os.getenv('SUMMARY_MODEL', 'gemini')
 GEMINI_MODEL_NAME = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.0-flash-exp')
 GEMINI_BASE_URL = os.getenv('GEMINI_BASE_URL', 'https://gemini.kbz.ink')
 
@@ -36,7 +43,8 @@ ERROR_WEBHOOK_URL = os.getenv('ERROR_WEBHOOK_URL')  # 专门用于错误通知�
 ERROR_QYWX_KEY = os.getenv('ERROR_QYWX_KEY')        # 错误通知企业微信机器人key
 ERROR_TG_BOT_TOKEN = os.getenv('ERROR_TG_BOT_TOKEN')  # 错误通知Telegram机器人token
 ERROR_TG_USER_ID = os.getenv('ERROR_TG_USER_ID')      # 错误通知Telegram用户ID
-ERROR_NOTIFICATION_ENABLED = os.getenv('ERROR_NOTIFICATION_ENABLED', 'true').lower() == 'true'
+ERROR_NOTIFICATION_ENABLED = os.getenv(
+    'ERROR_NOTIFICATION_ENABLED', 'true').lower() == 'true'
 
 # API配置
 BASE_URL = os.getenv('BASE_URL')
@@ -45,6 +53,7 @@ DEEPSEEK_MODEL_ID = os.getenv('DEEPSEEK_MODEL_ID')
 
 # RSS配置
 RSS_URL = os.getenv('RSS_URL')
+print(os.getenv('RSS_DAYS'))
 RSS_DAYS = int(os.getenv('RSS_DAYS', '1'))
 
 # RSS源列表
@@ -73,38 +82,38 @@ RSS_FEEDS = [
         'name': 'InfoQ',
         'url': 'https://www.infoq.cn/feed'
     },
-    {
-        'name': 'MarkTechPost',
-        'url': 'https://marktechpost.com/feed'
-    },
-    {
-        'name': 'Meta Research',
-        'url': 'https://research.facebook.com/feed/'
-    },
-    {
-        'name': 'VentureBeat',
-        'url': 'https://venturebeat.com/category/ai/feed/'
-    },
-    {
-        'name': 'AI news',
-        'url': 'https://www.artificialintelligence-news.com/feed/'
-    },
-    {
-        'name': 'Wired',
-        'url': 'https://www.wired.com/feed/tag/ai/latest/rss'
-    },
-    {
-        'name': 'Bloomberg',
-        'url': 'https://feeds.bloomberg.com/technology/news.rss'
-    },
-    {
-        'name': 'TechCrunch',
-        'url': 'https://techcrunch.com/category/artificial-intelligence/feed/'
-    },
-    {
-        'name': 'huggingface',
-        'url': 'https://huggingface.co/blog/feed.xml'
-    },
+    # {
+    #     'name': 'MarkTechPost',
+    #     'url': 'https://marktechpost.com/feed'
+    # },
+    # {
+    #     'name': 'Meta Research',
+    #     'url': 'https://research.facebook.com/feed/'
+    # },
+    # {
+    #     'name': 'VentureBeat',
+    #     'url': 'https://venturebeat.com/category/ai/feed/'
+    # },
+    # {
+    #     'name': 'AI news',
+    #     'url': 'https://www.artificialintelligence-news.com/feed/'
+    # },
+    # {
+    #     'name': 'Wired',
+    #     'url': 'https://www.wired.com/feed/tag/ai/latest/rss'
+    # },
+    # {
+    #     'name': 'Bloomberg',
+    #     'url': 'https://feeds.bloomberg.com/technology/news.rss'
+    # },
+    # {
+    #     'name': 'TechCrunch',
+    #     'url': 'https://techcrunch.com/category/artificial-intelligence/feed/'
+    # },
+    # {
+    #     'name': 'huggingface',
+    #     'url': 'https://huggingface.co/blog/feed.xml'
+    # },
     {
         'name': 'TechSpot',
         'url': 'https://www.techspot.com/backend.xml'
@@ -406,9 +415,9 @@ RSS_FEEDS = [
 ]
 
 # 其他配置
-TITLE_LENGTH = int(os.getenv('TITLE_LENGTH', '20'))
-MAX_WORKERS = int(os.getenv('MAX_WORKERS', '5'))
-FILTER_DAYS = int(os.getenv('FILTER_DAYS', '1'))
+TITLE_LENGTH = int(os.getenv('TITLE_LENGTH', '20').split('#')[0].strip())
+MAX_WORKERS = int(os.getenv('MAX_WORKERS', '5').split('#')[0].strip())
+FILTER_DAYS = int(os.getenv('FILTER_DAYS', '1').split('#')[0].strip())
 
 # 科技相关的信息源列表
 TECH_SOURCES = [
@@ -419,7 +428,7 @@ TECH_SOURCES = [
     "36kr",         # 科技创新创业资讯平台
     "juejin",       # 开发者技术社区
     "csdn",         # 专业技术博客平台
-    "51cto",        # IT技术运维社区  
+    "51cto",        # IT技术运维社区
     "huxiu",        # 科技商业媒体
     "ifanr",        # 聚焦智能硬件的科技媒体
     # "coolapk",      # 安卓应用和科技产品讨论
@@ -458,18 +467,18 @@ ALL_SOURCES = [
     "v2ex",       # V2EX
     "hostloc",    # 全球主机交流
     "sina-news",  # 新浪新闻
-    "netease-news", # 网易新闻
+    "netease-news",  # 网易新闻
     "qq-news",    # 腾讯新闻
     "thepaper",   # 澎湃新闻
     "jianshu",    # 简书
     "guokr",      # 果壳
     "acfun",      # AcFun
-    "douban-movie", # 豆瓣电影
-    "douban-group", # 豆瓣讨论小组
-    "zhihu-daily", # 知乎日报
-    "ithome-xijiayi", # IT之家「喜加一」
+    "douban-movie",  # 豆瓣电影
+    "douban-group",  # 豆瓣讨论小组
+    "zhihu-daily",  # 知乎日报
+    "ithome-xijiayi",  # IT之家「喜加一」
     "ngabbs",     # NGA
-    "hellogithub", # HelloGitHub
+    "hellogithub",  # HelloGitHub
     "nodeseek",   # NodeSeek
     "miyoushe",   # 米游社
     "genshin",    # 原神

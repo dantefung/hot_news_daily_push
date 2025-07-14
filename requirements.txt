@@ -39,6 +39,8 @@ langchain-openai>=0.0.5
 # ==========================================
 google-generativeai>=0.8.0    # Google Gemini API客户端
 
+lxml_html_clean
+
 # ==========================================
 # 开发和测试工具 (Development & Testing - Optional)
 # ==========================================

@@ -19,6 +19,16 @@ from utils.utils import format_title_for_display
 # 配置日志
 logger = logging.getLogger(__name__)
 
+# 定义代理
+# proxies = {
+#     "http": "http://127.0.0.1:1080",
+#     "https": "http://127.0.0.1:1080"
+# }
+proxies = None
+
+# 检查是否配置了代理
+use_proxies = bool(proxies)
+
 def summarize_with_gemini(hotspots, api_key, model_name="gemini-2.0-flash-exp", base_url="https://gemini.kbz.ink", max_retries=3, tech_only=False):
     """
     使用Google Gemini API对热点进行汇总归类，支持重试
@@ -138,7 +148,8 @@ def summarize_with_gemini(hotspots, api_key, model_name="gemini-2.0-flash-exp", 
                 api_url,
                 headers=headers,
                 json=payload,
-                timeout=60
+                timeout=60,
+                proxies=proxies if use_proxies else None  # 根据条件使用代理
             )
             
             response.raise_for_status()
@@ -380,7 +391,8 @@ def test_gemini_connection(api_key, model_name="gemini-2.0-flash-exp", base_url=
             api_url,
             headers=headers,
             json=payload,
-            timeout=30
+            timeout=30,
+            proxies=proxies if use_proxies else None  # 根据条件使用代理
         )
         
         response.raise_for_status()
@@ -445,3 +457,17 @@ def test_gemini_connection(api_key, model_name="gemini-2.0-flash-exp", base_url=
     except Exception as e:
         logger.error(f"Gemini API连接测试失败: {str(e)}")
         return False, str(e) 
+
+def main():
+    api_key = "AIzaSyDAqrscbINAOjb9xXW_Mbas8gDrtBBCK-U"  # 请替换为实际的API密钥
+    model_name = "gemini-2.0-flash"
+    # base_url = "https://generativelanguage.googleapis.com"
+    base_url = "https://api-proxy.me/gemini"
+    success, message = test_gemini_connection(api_key, model_name, base_url)
+    if success:
+        print("连接成功:", message)
+    else:
+        print("连接失败:", message)
+
+if __name__ == "__main__":
+    main() 
