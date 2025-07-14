@@ -343,13 +343,15 @@ class GitHubUtils:
         Returns:
             str: 文件内容
         """
+        # 如果 summary 是 list，自动拼接为字符串
+        if isinstance(summary, list):
+            summary = '\n'.join(str(s) for s in summary)
         # 构建完整的markdown内容
         content_lines = [
             f"# 科技日报 - {date_str}",
             "",
             summary
         ]
-
         return "\n".join(content_lines)
 
 
