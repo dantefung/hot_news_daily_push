@@ -104,7 +104,7 @@ class GitHubPublisher(PostProcessorInterface):
                 logger.warning("GitHub配置不完整，跳过推送")
                 return summary
 
-            # 使用GitHub工具类发布每日总结
+            # 使用GitHub工具类发布每日总结，传递context以支持多稿件
             success = self.github_utils.publish_daily_summary(summary, context)
 
             if success:

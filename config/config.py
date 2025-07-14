@@ -58,30 +58,30 @@ RSS_DAYS = int(os.getenv('RSS_DAYS', '1'))
 
 # RSS源列表
 RSS_FEEDS = [
-    {
-        'name': 'OpenAI Blog',
-        'url': 'https://openai.com/blog/rss.xml'
-    },
-    {
-        'name': '机器之心',
-        'url': 'https://www.jiqizhixin.com/rss'
-    },
-    {
-        'name': '极客公园',
-        'url': 'http://www.geekpark.net/rss'
-    },
-    {
-        'name': 'Google DeepMind',
-        'url': 'https://deepmind.google/blog/rss.xml'
-    },
-    {
-        'name': '量子位',
-        'url': 'https://www.qbitai.com/feed'
-    },
-    {
-        'name': 'InfoQ',
-        'url': 'https://www.infoq.cn/feed'
-    },
+    # {
+    #     'name': 'OpenAI Blog',
+    #     'url': 'https://openai.com/blog/rss.xml'
+    # },
+    # {
+    #     'name': '机器之心',
+    #     'url': 'https://www.jiqizhixin.com/rss'
+    # },
+    # {
+    #     'name': '极客公园',
+    #     'url': 'http://www.geekpark.net/rss'
+    # },
+    # {
+    #     'name': 'Google DeepMind',
+    #     'url': 'https://deepmind.google/blog/rss.xml'
+    # },
+    # {
+    #     'name': '量子位',
+    #     'url': 'https://www.qbitai.com/feed'
+    # },
+    # {
+    #     'name': 'InfoQ',
+    #     'url': 'https://www.infoq.cn/feed'
+    # },
     # {
     #     'name': 'MarkTechPost',
     #     'url': 'https://marktechpost.com/feed'
@@ -418,6 +418,9 @@ RSS_FEEDS = [
 TITLE_LENGTH = int(os.getenv('TITLE_LENGTH', '20').split('#')[0].strip())
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', '5').split('#')[0].strip())
 FILTER_DAYS = int(os.getenv('FILTER_DAYS', '1').split('#')[0].strip())
+
+# 生成润色稿件数量（可配置）
+REFINED_DRAFT_COUNT = int(os.getenv('REFINED_DRAFT_COUNT', '2'))
 
 # 科技相关的信息源列表
 TECH_SOURCES = [

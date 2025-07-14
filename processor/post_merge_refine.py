@@ -16,6 +16,7 @@ from typing import List, Optional, Tuple, Dict, Any
 
 # 导入扩展点接口
 from processor import PostProcessorInterface
+from config.config import REFINED_DRAFT_COUNT
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -345,7 +346,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             logger.error(f"保存润色内容失败: {output_path}，错误: {e}")
             return False
 
-    def process(self, summary: str, context: Dict[str, Any]) -> str:
+    def process(self, summary: str, context: Dict[str, Any]) -> List[str]:
         """
         处理摘要内容（符合PostProcessorInterface接口）
 
@@ -354,40 +355,39 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             context: 处理上下文
 
         Returns:
-            str: 处理后的摘要内容
+            List[str]: 处理后的摘要内容列表
         """
         try:
-            # 创建临时文件保存summary
             import tempfile
-
+            draft_count = context.get(
+                'refined_draft_count', REFINED_DRAFT_COUNT)
+            refined_summaries = []
+            output_paths = []
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as temp_file:
                 temp_file.write(summary)
                 temp_summary_path = temp_file.name
-
-            # 创建输出文件路径
             timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             output_dir = os.path.join("data", "outputs")
             os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(
-                output_dir, f"refined_summary_{timestamp_str}.md")
-
-            # 执行原有的处理逻辑
-            success = self._process_internal(
-                temp_summary_path, output_path, context.get('summary_model', 'gemini'))
-
-            if success:
-                # 读取处理后的内容
-                with open(output_path, 'r', encoding='utf-8') as f:
-                    refined_summary = f.read()
-                logger.info(f"后置处理成功，处理后摘要长度: {len(refined_summary)}")
-                return refined_summary
-            else:
-                logger.warning("后置处理失败，返回原始summary")
-                return summary
-
+            for i in range(1, draft_count + 1):
+                output_path = os.path.join(
+                    output_dir, f"refined_summary_{timestamp_str}_draft_{i}.md")
+                output_paths.append(output_path)
+                success = self._process_internal(
+                    temp_summary_path, output_path, context.get('summary_model', 'gemini'))
+                if success:
+                    with open(output_path, 'r', encoding='utf-8') as f:
+                        refined_summary = f.read()
+                    logger.info(
+                        f"后置处理成功，处理后摘要长度: {len(refined_summary)} (draft {i})")
+                    refined_summaries.append(refined_summary)
+                else:
+                    logger.warning(f"后置处理失败（draft {i}），返回原始summary")
+                    refined_summaries.append(summary)
+            return refined_summaries
         except Exception as e:
             logger.error(f"后置处理失败: {str(e)}")
-            return summary
+            return [summary]
 
     def _process_internal(self, summary_path: str, output_path: str, llm_type: str = "gemini") -> bool:
         """

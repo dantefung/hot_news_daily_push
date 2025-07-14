@@ -154,8 +154,8 @@ AI显著降低创业门槛，促投资思变。
 
         # 8. 测试保存功能
         logger.info("8. 测试保存功能...")
-        test_output_path = "data/test/standalone_test_output.md"
-        os.makedirs("data/test", exist_ok=True)
+        test_output_path = "../data/test/standalone_test_output.md"
+        os.makedirs("../data/test", exist_ok=True)
         success = processor.save_refined_content(
             preprocessed_content, test_output_path)
         logger.info(f"✅ 保存功能: {success}")
@@ -166,7 +166,7 @@ AI显著降低创业门槛，促投资思变。
             temp_file.write(test_summary)
             temp_summary_path = temp_file.name
 
-        output_path = "data/test/standalone_final_output.md"
+        output_path = "../data/test/standalone_final_output.md"
         success = processor._process_internal(
             temp_summary_path, output_path, "gemini")
         logger.info(f"✅ 完整处理流程: {success}")
@@ -182,7 +182,7 @@ AI显著降低创业门槛，促投资思变。
         # 11. 保存测试结果
         logger.info("11. 保存测试结果...")
         timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        test_results_path = f"data/test/standalone_test_results_{timestamp_str}.md"
+        test_results_path = f"../data/test/standalone_test_results_{timestamp_str}.md"
 
         with open(test_results_path, 'w', encoding='utf-8') as f:
             f.write(f"# Post Merge Refine 独立测试结果 - {timestamp_str}\n\n")
@@ -204,6 +204,20 @@ AI显著降低创业门槛，促投资思变。
             f.write(f"- LLM适配器: ✅\n")
 
         logger.info(f"✅ 测试结果已保存到: {test_results_path}")
+
+        # 12. 测试多稿件生成能力
+        logger.info("12. 测试多稿件生成能力（多draft）...")
+        context_multi = {'enable_post_process': True, 'refined_draft_count': 2}
+        refined_summaries = processor.process(test_summary, context_multi)
+        assert isinstance(refined_summaries, list) and len(
+            refined_summaries) == 2, "应生成2份润色稿件"
+        for idx, refined in enumerate(refined_summaries, 1):
+            logger.info(f"Draft {idx} 内容长度: {len(refined)} 字符")
+            draft_path = f"../data/test/standalone_draft_{idx}.md"
+            with open(draft_path, 'w', encoding='utf-8') as f:
+                f.write(refined)
+            logger.info(f"✅ Draft {idx} 已保存到: {draft_path}")
+        logger.info("🎉 多稿件生成能力测试通过！")
 
         logger.info("🎉 所有测试完成！")
         return True

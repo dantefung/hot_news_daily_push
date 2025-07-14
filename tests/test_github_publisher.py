@@ -235,6 +235,29 @@ class TestGitHubPublisher(unittest.TestCase):
         self.assertEqual(publisher.branch, "main")
         self.assertEqual(publisher.path, "daily")
 
+    @patch.object(GitHubPublisher, 'github_utils')
+    def test_process_multi_draft(self, mock_github_utils):
+        """测试多稿件推送能力"""
+        # 模拟publish_daily_summary为True
+        mock_github_utils.publish_daily_summary.return_value = True
+        publisher = GitHubPublisher()
+        context = dict(self.test_context)
+        context['refined_summaries'] = ["稿件1内容", "稿件2内容"]
+        result = publisher.process("稿件1内容", context)
+        self.assertEqual(result, "稿件1内容")
+        mock_github_utils.publish_daily_summary.assert_called_with(
+            "稿件1内容", context)
+
+    @patch('utils.github_utils.GitHubUtils.publish_daily_summary')
+    def test_publish_daily_summary_multi(self, mock_publish):
+        """测试publish_daily_summary多稿件推送"""
+        from utils.github_utils import GitHubUtils
+        github_utils = GitHubUtils(
+            token="t", repo_owner="o", repo_name="r", branch="b")
+        context = {'refined_summaries': ["A", "B"]}
+        github_utils.publish_daily_summary("A", context)
+        mock_publish.assert_called_with("A", context)
+
 
 if __name__ == "__main__":
     unittest.main()

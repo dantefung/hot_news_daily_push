@@ -477,11 +477,12 @@ def safe_main():
             }
 
             # 使用扩展点系统处理摘要
-            refined_summary = process_summary_with_plugins(summary, context)
-
-            if refined_summary != summary:
-                logger.info(f"后置处理成功，处理后摘要长度: {len(refined_summary)}")
-                summary = refined_summary
+            refined_summaries = process_summary_with_plugins(summary, context)
+            if isinstance(refined_summaries, list) and refined_summaries:
+                summary = refined_summaries[0]
+                context['refined_summaries'] = refined_summaries
+                logger.info(
+                    f"后置处理成功，生成{len(refined_summaries)}份摘要，主推送第1份，全部写入context['refined_summaries']")
             else:
                 logger.info("后置处理未改变摘要内容")
 
