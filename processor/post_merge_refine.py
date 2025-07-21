@@ -135,13 +135,13 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 
     def ai_refine_content(self, merged_content: str) -> str:
         """
-        使用AI对合并内容进行去重和润色
+        使用AI对合并内容进行去重和润色，并生成SEO标题
 
         Args:
             merged_content: 合并后的内容
 
         Returns:
-            str: 润色后的内容
+            str: 润色后的内容（带SEO标题）
         """
         if not self.llm_integration:
             logger.warning("未配置LLM集成，跳过AI润色")
@@ -191,10 +191,23 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 ### 6. 摘要换行要求
 - **请特别注意：AI内容摘要（即“AI内容摘要”代码块内的内容）如果过长，请自动合理换行，建议每行不超过40个中文字符，英文不强制换行。**
 
+### 7. SEO标题生成
+- **首要任务：** 从今日内容中，**精准定位最吸引眼球、最具争议性或最重大的新闻事件**作为标题核心。
+- **创作目标：** 生成一个10字以内、**极具吸引力、能引发好奇心**的SEO友好中文标题。
+- **标题技巧：**
+    - **提炼“噱头”：** 抓住最劲爆的点，如“惊天漏洞”、“再爆争议”、“黑科技发布”、“免费用”等。
+    - **制造悬念或冲突：** 如“AI巨头互撕”、“...或成最大赢家”、“...时代终结？”。
+    - **突出“最”或“首次”：** 找到文中的“最强”、“首次公开”等突破性信息。
+- **确保相关：** 标题必须源于正文，不能凭空捏造。
+- **风格多样：** 在确保“吸睛”和“相关”的前提下，每次生成时请变换风格角度，避免重复。
+- 直接以“SEO标题: xxx”单独一行输出在最前面。
+
 ## 输出格式要求：
 **请直接输出以下格式的markdown内容，不要添加任何其他文字：**
 
-## AI科技日报 {self.today}
+SEO标题: xxx
+
+# AI科技日报-2025-07-21
 
 > 🤖 AI科技日报 | ⏰ 每日精选 | 🌐 全球资讯 | 🔬 前沿探索 | 💡 深度分析 | 🛠️ 开源创新 | 🚀 未来展望 | [🌍 网页版↗️]
 
@@ -262,6 +275,23 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                 f.write(refined_content)
             logger.info(f"已保存大模型响应到: {response_path}")
 
+            # 自动提取SEO标题并插入到Markdown一级标题
+            import re
+            seo_title = None
+            lines = refined_content.splitlines()
+            for i, line in enumerate(lines):
+                m = re.match(r"SEO标题[:：]\s*(.+)", line)
+                if m:
+                    seo_title = m.group(1).strip()
+                    # 查找下一个一级标题
+                    for j in range(i+1, len(lines)):
+                        if lines[j].startswith("# AI科技日报-"):
+                            lines[j] = f"# AI科技日报-2025-07-21 {seo_title}"
+                            break
+                    # 移除SEO标题行
+                    lines.pop(i)
+                    break
+            refined_content = "\n".join(lines)
             return refined_content
 
         except Exception as e:
@@ -303,7 +333,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                 return False, "内容不是有效的markdown格式"
 
             # 检查是否包含标题
-            if "AI洞察日报" not in refined_content:
+            if "科技日报" not in refined_content:
                 return False, "缺少日报标题"
 
             # 检查内容长度

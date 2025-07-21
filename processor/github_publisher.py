@@ -104,15 +104,18 @@ class GitHubPublisher(PostProcessorInterface):
                 logger.warning("GitHub配置不完整，跳过推送")
                 return summary
 
+            # 自动生成带年月的path
+            monthly_path = self.path
+
             # 如果有多份稿件，分别推送
             if context and 'refined_summaries' in context and isinstance(context['refined_summaries'], list):
                 for idx, summ in enumerate(context['refined_summaries'], 1):
                     # 复制context，带上当前编号
                     ctx = dict(context)
                     ctx['release_idx'] = idx
-                    self.github_utils.publish_daily_summary(summ, ctx)
+                    self.github_utils.publish_daily_summary(summ, ctx, path=monthly_path)
             else:
-                self.github_utils.publish_daily_summary(summary, context)
+                self.github_utils.publish_daily_summary(summary, context, path=monthly_path)
 
             logger.info(f"✅ 成功推送到GitHub: {self.repo_owner}/{self.repo_name}")
             return summary
