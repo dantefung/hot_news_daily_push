@@ -348,7 +348,7 @@ class GitHubUtils:
             summary = '\n'.join(str(s) for s in summary)
         # 构建完整的markdown内容
         content_lines = [
-            f"# 科技日报 - {date_str}",
+            # f"# 科技日报 - {date_str}",
             "",
             summary
         ]
