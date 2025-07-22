@@ -13,10 +13,12 @@ import requests
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
+from zoneinfo import ZoneInfo
 
 # 导入扩展点接口
 from processor import PostProcessorInterface
 from config.config import REFINED_DRAFT_COUNT
+from utils.utils import get_beijing_now
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -45,7 +47,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
         """
         self.llm_integration = llm_integration
         self.enable_enhanced_processing = enable_enhanced_processing
-        self.today = datetime.now().strftime('%Y-%m-%d')
+        # self.today = datetime.now().strftime('%Y-%m-%d')
+        # self.today = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d')
+        self.today = get_beijing_now().strftime('%Y-%m-%d')
 
     def get_name(self) -> str:
         """获取处理器名称"""
@@ -154,6 +158,8 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 
 **重要：请直接输出markdown内容，不要添加任何确认语句、解释或前言。**
 
+**特别要求：资讯中如有配图（image_url 字段），必须在输出中保留并展示该配图，图片应与对应新闻条目关联。**
+
 {merged_content}
 
 ## 处理要求：
@@ -187,6 +193,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 验证链接的有效性
 - 保持内容的时效性
 - 确保信息的准确性和可靠性
+- **如有配图（image_url），必须在输出中保留并展示该配图**
 
 ### 6. 摘要换行要求
 - **请特别注意：AI内容摘要（即“AI内容摘要”代码块内的内容）如果过长，请自动合理换行，建议每行不超过40个中文字符，英文不强制换行。**
@@ -207,7 +214,8 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 
 SEO标题: xxx
 
-# AI科技日报-2025-07-21
+# AI科技日报-{self.today}
+
 
 > 🤖 AI科技日报 | ⏰ 每日精选 | 🌐 全球资讯 | 🔬 前沿探索 | 💡 深度分析 | 🛠️ 开源创新 | 🚀 未来展望 | [🌍 网页版↗️]
 
@@ -224,7 +232,8 @@ SEO标题: xxx
 - 技术/方法名称（用**加粗**）
 - 技术原理和优势
 - 相关链接（论文地址、项目地址等）
-- 使用emoji增强可读性]
+- 使用emoji增强可读性
+- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
 
 ### 开源TOP项目
 
@@ -233,7 +242,8 @@ SEO标题: xxx
 - 项目简介和特色功能
 - GitHub星数（如适用）
 - 项目地址链接
-- 使用emoji增强可读性]
+- 使用emoji增强可读性
+- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
 
 ### 社媒分享
 
@@ -242,7 +252,8 @@ SEO标题: xxx
 - 核心观点和见解
 - 相关链接
 - 图片链接（如适用）
-- 使用emoji增强可读性]
+- 使用emoji增强可读性
+- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
 
 ---
 
@@ -258,7 +269,9 @@ SEO标题: xxx
             import os
             from datetime import datetime
             os.makedirs("data/outputs", exist_ok=True)
-            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # 修改为东八区
+            timestamp_str = datetime.now(ZoneInfo('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S")
             prompt_path = f"data/outputs/llm_prompt_{timestamp_str}.txt"
             with open(prompt_path, 'w', encoding='utf-8') as f:
                 f.write(prompt)
@@ -396,7 +409,9 @@ SEO标题: xxx
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as temp_file:
                 temp_file.write(summary)
                 temp_summary_path = temp_file.name
-            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # 修改为东八区
+            timestamp_str = datetime.now(ZoneInfo('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S")
             output_dir = os.path.join("data", "outputs")
             os.makedirs(output_dir, exist_ok=True)
             for i in range(1, draft_count + 1):
@@ -471,7 +486,9 @@ SEO标题: xxx
                 # 保存预处理结果用于调试
                 outputs_dir = os.path.join("data", "outputs")
                 os.makedirs(outputs_dir, exist_ok=True)
-                timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                # timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                # 修改为东八区
+                timestamp_str = datetime.now(ZoneInfo('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S")
                 outputs_path = os.path.join(
                     outputs_dir, f"preprocessed_{timestamp_str}.md")
                 with open(outputs_path, 'w', encoding='utf-8') as f:
@@ -815,8 +832,11 @@ class LLMIntegrationAdapter:
         for i, item in enumerate(json_data, 1):
             title = item.get('title', '')
             related_ids = item.get('related_ids', [])
+            image_url = item.get('image_url', '')
 
             markdown_lines.append(f"## ** {i:02d} {title} **")
+            if image_url:
+                markdown_lines.append(f"![配图]({image_url})")
             if related_ids:
                 markdown_lines.append(f"- 相关ID: {related_ids}")
             markdown_lines.append("")

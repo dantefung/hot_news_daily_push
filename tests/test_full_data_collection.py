@@ -46,7 +46,7 @@ from config.config import (
 )
 
 # 导入工具函数
-from utils.utils import save_hotspots_to_jsonl, check_base_url
+from utils.utils import save_hotspots_to_jsonl, check_base_url, assign_image_url_to_items
 
 # 导入数据收集模块
 from crawler.data_collector import collect_all_hotspots, fetch_rss_articles, filter_recent_hotspots
@@ -104,6 +104,7 @@ async def test_full_data_collection():
     logger.info(f"成功收集到 {len(hotspots)} 条热点数据")
     
     # 保存原始热点数据
+    assign_image_url_to_items(hotspots)
     original_file = save_hotspots_to_jsonl(hotspots, directory=os.path.join("data", "raw"))
     logger.info(f"原始热点数据已保存到: {original_file}")
     
@@ -112,6 +113,7 @@ async def test_full_data_collection():
     logger.info(f"筛选后剩余 {len(hotspots)} 条热点数据")
     
     # 保存筛选后的热点数据
+    assign_image_url_to_items(hotspots)
     filtered_file = save_hotspots_to_jsonl(hotspots, directory=os.path.join("data", "filtered"))
     logger.info(f"筛选后的热点数据已保存到: {filtered_file}")
     
@@ -122,10 +124,12 @@ async def test_full_data_collection():
     logger.info(f"成功获取到 {len(rss_articles)} 篇RSS文章")
     
     # 合并热点和RSS文章
+    assign_image_url_to_items(rss_articles)
     all_content = hotspots + rss_articles
     logger.info(f"合并后共有 {len(all_content)} 条内容")
     
     # 保存合并后的数据
+    assign_image_url_to_items(all_content)
     merged_file = save_hotspots_to_jsonl(all_content, directory=os.path.join("data", "merged"))
     logger.info(f"合并后的数据已保存到: {merged_file}")
     
@@ -140,6 +144,7 @@ async def test_full_data_collection():
             logger.info(f"已为 {len(all_content_with_summary)} 条内容生成摘要")
             
             # 保存处理后的数据
+            assign_image_url_to_items(all_content_with_summary)
             processed_file = save_hotspots_to_jsonl(all_content_with_summary, directory=os.path.join("data", "processed"))
             logger.info(f"处理后的数据已保存到: {processed_file}")
             

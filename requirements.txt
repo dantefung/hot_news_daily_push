@@ -21,6 +21,13 @@ newspaper3k>=0.2.8            # 新闻文章内容提取
 trafilatura>=2.0.0            # 网页文本内容提取
 
 # ==========================================
+# 图片处理和验证 (Image Processing & Validation)
+# ==========================================
+Pillow>=9.0.0                 # 图片处理库（可选，用于图片验证）
+pyzbar>=0.1.9                 # 二维码检测库（用于过滤二维码图片）
+urllib3>=1.26.0               # HTTP客户端库，用于图片URL验证
+
+# ==========================================
 # 日期时间处理 (Date & Time Processing)
 # ==========================================
 python-dateutil>=2.8.2       # 扩展的日期时间解析和处理
@@ -66,3 +73,4 @@ lxml_html_clean
 #
 # 4. 运行测试:
 #    python tests/test_gemini_integration.py
+#    python tests/test_image_extractor.py  # 新增：测试图片提取功能

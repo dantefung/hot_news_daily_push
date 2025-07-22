@@ -299,7 +299,8 @@ def _process_rss_feed(feed, feed_name, feed_url, days, cutoff_time, current_time
                     "source": source,
                     "hot": "",
                     "published": pub_time.strftime("%Y-%m-%d %H:%M:%S") if pub_time else "",
-                    "needs_time_extraction": pub_time is None  # 标记是否需要从网页提取时间
+                    "needs_time_extraction": pub_time is None,  # 标记是否需要从网页提取时间
+                    "image_url": entry_data.get("image_url", "")  # 新增：图片URL字段
                 }
                 
                 # 检查是否已有内容或摘要，如果有则直接添加，避免后续重复爬取
@@ -651,7 +652,8 @@ def fetch_rss_articles(rss_url=None, days=1, rss_feeds=None):
                                 "source": source,
                                 "hot": "",
                                 "published": pub_time.strftime("%Y-%m-%d %H:%M:%S") if pub_time else "",
-                                "needs_time_extraction": pub_time is None  # 标记是否需要从网页提取时间
+                                "needs_time_extraction": pub_time is None,  # 标记是否需要从网页提取时间
+                                "image_url": entry_data.get("image_url", "")  # 新增：图片URL字段
                             }
                             
                             content_found = False
@@ -858,7 +860,8 @@ def fetch_rss_articles(rss_url=None, days=1, rss_feeds=None):
                             "source": source,
                             "hot": "",
                             "published": pub_time.strftime("%Y-%m-%d %H:%M:%S") if pub_time else "",
-                            "needs_time_extraction": pub_time is None  # 标记是否需要从网页提取时间
+                            "needs_time_extraction": pub_time is None,  # 标记是否需要从网页提取时间
+                            "image_url": entry_data.get("image_url", "")  # 新增：图片URL字段
                         }
                         
                         content_found = False

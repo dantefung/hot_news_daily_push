@@ -25,6 +25,14 @@ from trafilatura import extract
 # 配置日志
 logger = logging.getLogger(__name__)
 
+# 导入图片提取模块
+try:
+    from utils.image_extractor import extract_first_image_from_content
+    IMAGE_EXTRACTOR_AVAILABLE = True
+except ImportError:
+    IMAGE_EXTRACTOR_AVAILABLE = False
+    logger.warning("无法导入图片提取模块，将跳过图片提取")
+
 # 尝试导入crawl4ai集成模块
 try:
     from crawler.crawl4ai_integration import crawl4ai
@@ -35,7 +43,7 @@ except ImportError:
 
 def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None, fetch_html_only=False):
     """
-    获取网页内容，返回处理后的文本内容和原始HTML
+    获取网页内容，返回处理后的文本内容、原始HTML和图片URL
     如果提供了existing_content，则直接使用该内容而不进行爬取
     优先使用crawl4ai，失败时回退到传统方法（cloudscraper + 多种内容提取方法）
     If fetch_html_only is True, then only get the raw HTML, without extracting the text content.
@@ -50,7 +58,7 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
         # Even if using existing content, we might need HTML later for timestamp extraction, 
         # but we don't have it if we skip fetching. Return None for HTML in this case.
         # If fetch_html_only was True, this block is skipped anyway.
-        return existing_content, None
+        return existing_content, None, ""
     
     # 检查是否是需要JavaScript渲染的网站
     def requires_javascript_rendering(url):
@@ -81,12 +89,12 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
                     # 如果只需要HTML，直接返回
                     if fetch_html_only:
                         logger.info(f"crawl4ai成功获取HTML: {url}, HTML长度: {len(html_content)}")
-                        return None, html_content
+                        return None, html_content, ""
                     
                     # 返回处理后的内容
                     processed_content = preprocess_webpage_content(content)
                     logger.info(f"crawl4ai成功获取JS渲染网页内容: {url}, 原始长度: {len(content)}, 处理后长度: {len(processed_content)}")
-                    return processed_content, html_content
+                    return processed_content, html_content, ""
                 else:
                     logger.warning(f"crawl4ai爬取JS渲染网页失败: {url}, 错误: {result['error']}")
                     
@@ -105,12 +113,12 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
                     # 如果只需要HTML，直接返回
                     if fetch_html_only:
                         logger.info(f"crawl4ai备用方案成功获取HTML: {url}, HTML长度: {len(html_content)}")
-                        return None, html_content
+                        return None, html_content, ""
                     
                     # 返回处理后的内容
                     processed_content = preprocess_webpage_content(content)
                     logger.info(f"crawl4ai备用方案成功获取JS渲染网页内容: {url}, 处理后长度: {len(processed_content)}")
-                    return processed_content, html_content
+                    return processed_content, html_content, ""
                 else:
                     logger.warning(f"crawl4ai备用方案爬取JS渲染网页失败: {url}, 错误: {result['error']}")
             except Exception as e:
@@ -118,7 +126,7 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
         
         # 如果crawl4ai都不可用，对于需要JavaScript的网站，直接返回提示信息
         logger.warning(f"无法处理需要JavaScript渲染的网站: {url}，crawl4ai不可用")
-        return "此网页需要JavaScript渲染，请配置crawl4ai服务以获取完整内容。", ""
+        return "此网页需要JavaScript渲染，请配置crawl4ai服务以获取完整内容。", "", ""
     
     # 对于不需要JavaScript渲染的网站，优先使用crawl4ai（如果启用）
     if CRAWL4AI_AVAILABLE and crawl4ai.is_enabled():
@@ -133,12 +141,12 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
                 # 如果只需要HTML，直接返回
                 if fetch_html_only:
                     logger.info(f"crawl4ai成功获取HTML: {url}, HTML长度: {len(html_content)}")
-                    return None, html_content
+                    return None, html_content, ""
                 
                 # 返回处理后的内容
                 processed_content = preprocess_webpage_content(content)
                 logger.info(f"crawl4ai成功获取网页内容: {url}, 原始内容长度: {len(content)}, 处理后长度: {len(processed_content)}")
-                return processed_content, html_content
+                return processed_content, html_content, ""
             else:
                 logger.warning(f"crawl4ai爬取失败: {url}, 错误: {result['error']}, 回退到传统方法")
                 
@@ -201,7 +209,7 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
             # 如果只需要HTML，直接返回
             if fetch_html_only:
                 logger.info(f"仅获取原始HTML: {url}, HTML长度: {len(html_content)}")
-                return None, html_content # Return None for content, as it wasn't extracted
+                return None, html_content, "" # Return None for content, as it wasn't extracted
 
             # 检查是否是JavaScript渲染的页面
             if is_javascript_rendered_page(html_content):
@@ -219,27 +227,33 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
                             # 返回处理后的内容
                             processed_content = preprocess_webpage_content(content)
                             logger.info(f"crawl4ai备用方案成功处理JS渲染页面: {url}, 处理后长度: {len(processed_content)}")
-                            return processed_content, html_content
+                            return processed_content, html_content, ""
                         else:
                             logger.warning(f"crawl4ai备用方案处理JS渲染页面失败: {url}, 错误: {result['error']}")
                     except Exception as e:
                         logger.error(f"crawl4ai备用方案处理JS渲染页面出错: {url}, 错误: {str(e)}")
                 
                 # 如果crawl4ai备用方案也不可用，返回提示信息
-                return "此网页需要JavaScript渲染，请配置crawl4ai服务以获取完整内容。", html_content
+                return "此网页需要JavaScript渲染，请配置crawl4ai服务以获取完整内容。", html_content, ""
 
             # 使用多种方法提取内容，优先使用专业的新闻内容提取库
             processed_content = extract_content_with_multiple_methods(html_content, url)
             
-            logger.info(f"获取到网页内容: {url}, 原始HTML长度: {len(html_content)}, 处理后文本长度: {len(processed_content)} 字符")
+            # 提取图片URL
+            image_url = ""
+            if IMAGE_EXTRACTOR_AVAILABLE:
+                image_url = extract_first_image_from_content(html_content, url, "html")
+                if image_url:
+                    logger.info(f"从网页中提取到图片: {image_url}")
             
-            return processed_content, html_content
+            logger.info(f"获取到网页内容: {url}, 原始HTML长度: {len(html_content)}, 处理后文本长度: {len(processed_content)} 字符")
+            return processed_content, html_content, image_url
         except Exception as e:
             # 检查是否是 cloudscraper 特有的错误
             if "CloudflareJSChallengeError" in str(e) or "CloudflareCaptchaError" in str(e):
                  logger.warning(f"Cloudscraper 未能绕过 Cloudflare 保护: {url}, 错误: {str(e)}")
                  # 遇到无法绕过的 Cloudflare 保护，不再重试
-                 return "", ""
+                 return "", "", ""
             # 其他错误，执行重试逻辑
             retry_count += 1
             if retry_count < max_retries:
@@ -259,18 +273,18 @@ def fetch_webpage_content(url, timeout=20, max_retries=3, existing_content=None,
                             # 如果只需要HTML，直接返回
                             if fetch_html_only:
                                 logger.info(f"crawl4ai备用方案成功获取HTML: {url}, HTML长度: {len(html_content)}")
-                                return None, html_content
+                                return None, html_content, ""
                             
                             # 返回处理后的内容
                             processed_content = preprocess_webpage_content(content)
                             logger.info(f"crawl4ai备用方案成功获取网页内容: {url}, 处理后长度: {len(processed_content)}")
-                            return processed_content, html_content
+                            return processed_content, html_content, ""
                         else:
                             logger.warning(f"crawl4ai备用方案也失败: {url}, 错误: {result['error']}")
                     except Exception as e:
                         logger.error(f"crawl4ai备用方案出错: {url}, 错误: {str(e)}")
                 
-                return "", ""
+                return "", "", ""
 
 def extract_content_with_multiple_methods(html_content, url):
     """

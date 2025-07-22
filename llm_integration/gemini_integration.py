@@ -260,7 +260,10 @@ def summarize_with_gemini(hotspots, api_key, model_name="gemini-2.0-flash-exp", 
                                     item_title = item_title[:15] + "..."
                                 
                                 # 添加链接
-                                formatted_summary += f"- [{item_title}]({item['url']}) `🏷️{source_name}`\n"
+                                formatted_summary += f"- [{item_title}]({item['url']}) `��️{source_name}`\n"
+                                # 新增：如果有配图，插入图片
+                                if item.get('image_url'):
+                                    formatted_summary += f"  ![]({item['image_url']})\n"
                         
                         # 添加空行分隔
                         formatted_summary += "\n"
