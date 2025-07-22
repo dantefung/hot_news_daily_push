@@ -299,7 +299,7 @@ SEO标题: xxx
                     # 查找下一个一级标题
                     for j in range(i+1, len(lines)):
                         if lines[j].startswith("# AI科技日报-"):
-                            lines[j] = f"# AI科技日报-2025-07-21 {seo_title}"
+                            lines[j] = f"# AI科技日报-{self.today} {seo_title}"
                             break
                     # 移除SEO标题行
                     lines.pop(i)
