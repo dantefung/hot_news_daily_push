@@ -311,10 +311,10 @@ RSS_FEEDS = [
         "name": "公众号-PaperWeekly",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3201788143.atom"
     },
-    {
-        "name": "公众号-MacTalk",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_2398460220.atom"
-    },
+    # {
+    #     "name": "公众号-MacTalk",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_2398460220.atom"
+    # },
     {
         "name": "公众号-李继刚",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3913757353.atom"
@@ -323,10 +323,10 @@ RSS_FEEDS = [
         "name": "公众号-歸藏的AI工具箱",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3540975510.atom"
     },
-    {
-        "name": "公众号-谷歌开发者",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3008689962.atom"
-    },
+    # {
+    #     "name": "公众号-谷歌开发者",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3008689962.atom"
+    # },
     {
         "name": "公众号-EverAI酱",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3099987471.atom"
@@ -343,10 +343,10 @@ RSS_FEEDS = [
         "name": "公众号-极客公园",
         "url": "https://werss.tuber.cc/feed/MP_WXS_1304308441.atom"
     },
-    {
-        "name": "公众号-Hugging Face",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3940425683.atom"
-    },
+    # {
+    #     "name": "公众号-Hugging Face",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3940425683.atom"
+    # },
     {
         "name": "公众号-海外独角兽",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3869640945.atom"
@@ -371,10 +371,10 @@ RSS_FEEDS = [
         "name": "公众号-AI生活研究所",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3013745912.atom"
     },
-    {
-        "name": "公众号-AI前线",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3554086560.atom"
-    },
+    # {
+    #     "name": "公众号-AI前线",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3554086560.atom"
+    # },
     {
         "name": "公众号-AI科技评论",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3098132220.atom"
@@ -391,22 +391,22 @@ RSS_FEEDS = [
         "name": "公众号-AI产品榜",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3099356578.atom"
     },
-    {
-        "name": "公众号-InfoQ",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_2390142780.atom"
-    },
-    {
-        "name": "公众号-新智元",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3271041950.atom"
-    },
-    {
-        "name": "公众号-机器之心",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3073282833.atom"
-    },
-    {
-        "name": "公众号-量子位",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3236757533.atom"
-    },
+    # {
+    #     "name": "公众号-InfoQ",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_2390142780.atom"
+    # },
+    # {
+    #     "name": "公众号-新智元",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3271041950.atom"
+    # },
+    # {
+    #     "name": "公众号-机器之心",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3073282833.atom"
+    # },
+    # {
+    #     "name": "公众号-量子位",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3236757533.atom"
+    # },
     {
         "name": "公众号-数字生命卡兹克",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3223096120.atom"
