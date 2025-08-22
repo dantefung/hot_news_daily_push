@@ -121,6 +121,7 @@ jobs:
           # ==========================================
           HUNYUAN_API_KEY: ${{ secrets.HUNYUAN_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
           BASE_URL: ${{ secrets.BASE_URL }}
           GEMINI_MODEL_NAME: ${{ secrets.GEMINI_MODEL_NAME }}
           GEMINI_BASE_URL: ${{ secrets.GEMINI_BASE_URL }}
