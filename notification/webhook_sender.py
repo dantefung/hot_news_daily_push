@@ -81,9 +81,31 @@ def format_content(content, is_tech_only=False):
     # 添加标题和查看全部热点的链接
     header = f"# {today} {current_time} {title_prefix}早报\n\n"
     footer = f"\n\n[查看全部热点](https://hot.tuber.cc/)"
-    
-    # 构建markdown格式的内容
-    markdown_content = header + content + footer
+
+    # 自动为每条新闻后追加图片（仅当内容不是AI自动生成的markdown汇总时）
+    def append_images_to_content(content):
+        import re, json
+        # 检查是否为AI自动生成的markdown汇总（有 ## ** 01 ... ** 结构）
+        if re.search(r"## \\*\\* \\d+ ", content):
+            return content
+        # 尝试按行分割，查找每条新闻的url和image_url
+        lines = content.split('\n')
+        new_lines = []
+        for line in lines:
+            new_lines.append(line)
+            # 检查是否有url字段
+            url_match = re.search(r'\((https?://[^)]+)\)', line)
+            if url_match:
+                url = url_match.group(1)
+                # 尝试在内容中查找 image_url
+                # 这里假设 image_url 以特殊格式出现在行尾（可根据实际格式调整）
+                img_match = re.search(r'image_url: (https?://[^\s]+)', line)
+                if img_match:
+                    img_url = img_match.group(1)
+                    new_lines.append(f'![]({img_url})')
+        return '\n'.join(new_lines)
+
+    markdown_content = header + append_images_to_content(content) + footer
     
     return {
         "title": f"{today} {current_time} {title_prefix}早报",

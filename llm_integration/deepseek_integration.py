@@ -186,10 +186,11 @@ def summarize_with_deepseek(hotspots, api_key, api_url=None, model_id=None, max_
                             # 格式化标题，确保长度一致
                             if len(item_title) > 18:
                                 item_title = item_title[:15] + "..."
-
                             # 添加链接
                             formatted_summary += f"- [{item_title}]({item['url']}) `🏷️{source_name}`\n"
-
+                            # 新增：如果有配图，插入图片
+                            if item.get('image_url'):
+                                formatted_summary += f"  ![]({item['image_url']})\n"
                     # 添加空行分隔
                     formatted_summary += "\n"
 

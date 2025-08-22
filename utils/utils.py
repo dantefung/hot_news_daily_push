@@ -15,6 +15,7 @@ import requests
 from pathlib import Path
 from datetime import datetime
 import time
+from utils.image_extractor import extract_first_image_from_content, assign_image_url_to_items
 
 # 配置日志
 logging.basicConfig(
@@ -196,3 +197,21 @@ def cleanup_old_files(directory, days_to_keep=7):
 
     except Exception as e:
         logger.error(f"清理目录 {directory} 时发生意外错误: {str(e)}")
+
+# ================== 时间相关工具 ==================
+
+def get_beijing_now():
+    """
+    获取东八区（北京时间）的当前时间，返回datetime对象。
+    优先使用zoneinfo，兼容pytz。
+    """
+    try:
+        from zoneinfo import ZoneInfo  # Python 3.9+
+        return datetime.now(ZoneInfo('Asia/Shanghai'))
+    except ImportError:
+        try:
+            from pytz import timezone
+            return datetime.now(timezone('Asia/Shanghai'))
+        except ImportError:
+            # 如果都没有，退回本地时间（不推荐）
+            return datetime.now()

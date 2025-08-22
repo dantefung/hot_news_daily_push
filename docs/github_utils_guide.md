@@ -234,3 +234,36 @@ python examples/github_utils_example.py
 ```
 requests>=2.25.0
 ``` 
+
+---
+
+## post_merge_refine.py SEO标题自动生成说明
+
+### 功能简介
+
+`PostMergeRefineProcessor` 新增 `generate_seo_title(markdown_content, max_length=10)` 方法，可根据日报内容自动生成10字以内SEO友好标题。
+
+### 用法示例
+
+```python
+from processor.post_merge_refine import PostMergeRefineProcessor
+
+processor = PostMergeRefineProcessor()
+with open('tests/test_data/2025-07-21_release_2.md', 'r', encoding='utf-8') as f:
+    content = f.read()
+seo_title = processor.generate_seo_title(content)
+print(f"AI科技日报-2025-07-21 {seo_title}")
+```
+
+### 生成逻辑
+- 优先提取“AI内容摘要”代码块内容
+- 其次提取各小节标题（如“AI前沿研究”、“开源TOP项目”等）
+- 再次提取高频关键词（如“安全”、“Agent”、“开源”等）
+- 自动组合并截断，保证不超过10个中文字符
+- 若无有效内容，兜底返回“AI创新日报”
+
+### 场景建议
+- 可用于日报网页、公众号、SEO优化等场景的标题自动生成
+- 支持自定义最大长度
+
+--- 

@@ -11,21 +11,11 @@
 - **完善测试文件目录结构**: 修复了测试文件保存到错误目录的问题，现在所有数据文件都按照设计的目录结构正确保存
 - **优化内容压缩策略**: 当内容超过字节长度限制时，智能减少关联ID数量和新闻条目数量，确保推送成功
 
-## 功能特点
+## 功能特性
 
-- **多源数据收集**：
-    - 支持从30+个平台（如微博、知乎、百度、抖音等）收集热点数据 (依赖外部API: `https://api-hot.imsyy.top`，基于项目 [DailyHotApi](https://github.com/imsyy/DailyHotApi))
-    - **支持通过配置文件 `config/config.py` 中的 `RSS_FEEDS` 列表订阅多个RSS源**
-      - 微信公众号文章通过 [wewe-rss](https://github.com/cooderl/wewe-rss) 项目转换为RSS源
-    - **集成特定Twitter Feed** (通过 [x-kit](https://github.com/tuber0613/x-kit) 项目获取指定账号的推文 - 默认获取近2天，处理时筛选近24小时)
-- **增强爬取策略**：
-    - **JavaScript渲染网站支持**：智能识别需要JavaScript渲染的网站（如掘金、Vue.js官网等），自动使用适当的爬取策略
-    - **支持 Crawl4AI 集成**：可选择使用 [Crawl4AI](https://docs.crawl4ai.com/) 服务进行高级网页爬取，在反爬虫、RSS内容提取和JavaScript渲染方面有显著优势
-    - **智能回退机制**：根据 `CRAWL4AI_ENABLED` 环境变量决定优先级
-      - `CRAWL4AI_ENABLED=true`：Crawl4AI（主要方案）→ 传统方法（回退）→ Crawl4AI（备用方案）
-      - `CRAWL4AI_ENABLED=false` 或未设置：传统方法（主要方案）→ Crawl4AI（备用方案，如果配置了API参数）
-    - **动态内容检测**：自动检测页面是否依赖JavaScript渲染，并在crawl4ai不可用时提供友好的错误提示
-    - **RSS 内容增强**：自动检测内容过短的RSS源（如机器之心、OpenAI等），使用 Crawl4AI 获取完整文章内容
+- **多源数据收集**：支持从多个热门平台收集热点信息，包括微博、知乎、百度、抖音、快手、贴吧、少数派、IT之家、今日头条、36氪、掘金、CSDN、51CTO、虎嗅、爱范儿、酷安、虎扑、V2EX、全球主机交流等
+- **RSS Feed支持**：支持从RSS/Atom feed中获取文章内容，包括OpenAI Blog、机器之心、极客公园、Google DeepMind、量子位、InfoQ、MarkTechPost、Meta Research、VentureBeat、AI news等
+- **Twitter集成**：支持从Twitter获取最新推文和讨论
 - **智能内容处理**：
     - 使用 `cloudscraper` 尝试绕过部分网站的Cloudflare保护获取RSS内容
     - **尝试从RSS Feed中预提取内容** (如 `content:encoded`)，减少后续网页抓取需求
@@ -38,6 +28,11 @@
         - 如抓取失败或内容不足，尝试截断源提供的原始描述（如果存在）。
         - 如以上均失败，使用占位符 `[摘要无法生成：无内容或来源信息不足]`。
         - **长度控制**: 最终所有有效摘要（原始、AI生成、截断）都会被检查，超过150字符会被截断并添加 `...`。
+    - **智能图片提取**：自动从资讯正文、RSS feed或网页中提取第一张图片作为配图
+        - 支持从Open Graph、Twitter图片、img标签、背景图片等多种方式提取
+        - 支持相对路径转绝对路径
+        - 验证图片URL的有效性
+        - 集成到RSS处理和网页爬取流程中
 - **AI驱动的最终总结**：
     - **多模型支持**：支持 Gemini（默认）、DeepSeek 和腾讯混元三种总结模型，可通过环境变量 `SUMMARY_MODEL` 切换。
     - 使用所选AI模型对去重和处理后的信息列表进行最终归纳总结。
@@ -72,6 +67,12 @@
 - **科技热点筛选**：可选择只收集和推送科技相关热点 (目前主要影响热榜、摘要生成时的判断以及Deepseek总结)。
 - **缓存机制**：支持**腾讯混元生成的摘要**缓存，提高运行效率（基于内容哈希）。
 - **自动清理**：自动清理 `data/raw`, `data/filtered`, `data/merged`, `data/inputs`, `data/outputs`, `data/webhook`, `cache/summary` 目录中超过 **7天** 的旧数据和日志文件。
+- **多渠道推送**：支持推送到企业微信、钉钉、飞书、Telegram、Discord、Slack、PushDeer、PushPlus、Webhook等多种渠道
+- **错误通知系统**：独立的错误通知通道，确保系统异常时能及时收到通知
+- **GitHub集成**：支持将生成的日报自动发布到GitHub仓库
+- **定时任务**：支持Docker容器化部署和定时执行
+- **缓存机制**：智能缓存摘要生成结果，避免重复处理相同内容
+- **数据持久化**：按日期组织数据文件，支持历史数据查询和分析
 
 ## 项目结构
 

@@ -13,10 +13,12 @@ import requests
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
+from zoneinfo import ZoneInfo
 
 # 导入扩展点接口
 from processor import PostProcessorInterface
 from config.config import REFINED_DRAFT_COUNT
+from utils.utils import get_beijing_now
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -45,7 +47,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
         """
         self.llm_integration = llm_integration
         self.enable_enhanced_processing = enable_enhanced_processing
-        self.today = datetime.now().strftime('%Y-%m-%d')
+        # self.today = datetime.now().strftime('%Y-%m-%d')
+        # self.today = datetime.now(ZoneInfo('Asia/Shanghai')).strftime('%Y-%m-%d')
+        self.today = get_beijing_now().strftime('%Y-%m-%d')
 
     def get_name(self) -> str:
         """获取处理器名称"""
@@ -135,13 +139,13 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 
     def ai_refine_content(self, merged_content: str) -> str:
         """
-        使用AI对合并内容进行去重和润色
+        使用AI对合并内容进行去重和润色，并生成SEO标题
 
         Args:
             merged_content: 合并后的内容
 
         Returns:
-            str: 润色后的内容
+            str: 润色后的内容（带SEO标题）
         """
         if not self.llm_integration:
             logger.warning("未配置LLM集成，跳过AI润色")
@@ -153,6 +157,8 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 你是一位专业的科技新闻编辑，请对以下合并的科技日报内容进行深度去重、融合和润色，并按照指定的格式输出。
 
 **重要：请直接输出markdown内容，不要添加任何确认语句、解释或前言。**
+
+**特别要求：资讯中如有配图（image_url 字段），必须在输出中保留并展示该配图，图片应与对应新闻条目关联。**
 
 {merged_content}
 
@@ -187,14 +193,29 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 验证链接的有效性
 - 保持内容的时效性
 - 确保信息的准确性和可靠性
+- **如有配图（image_url），必须在输出中保留并展示该配图**
 
 ### 6. 摘要换行要求
 - **请特别注意：AI内容摘要（即“AI内容摘要”代码块内的内容）如果过长，请自动合理换行，建议每行不超过40个中文字符，英文不强制换行。**
 
+### 7. SEO标题生成
+- **首要任务：** 从今日内容中，**精准定位最吸引眼球、最具争议性或最重大的新闻事件**作为标题核心。
+- **创作目标：** 生成一个10字以内、**极具吸引力、能引发好奇心**的SEO友好中文标题。
+- **标题技巧：**
+    - **提炼“噱头”：** 抓住最劲爆的点，如“惊天漏洞”、“再爆争议”、“黑科技发布”、“免费用”等。
+    - **制造悬念或冲突：** 如“AI巨头互撕”、“...或成最大赢家”、“...时代终结？”。
+    - **突出“最”或“首次”：** 找到文中的“最强”、“首次公开”等突破性信息。
+- **确保相关：** 标题必须源于正文，不能凭空捏造。
+- **风格多样：** 在确保“吸睛”和“相关”的前提下，每次生成时请变换风格角度，避免重复。
+- 直接以“SEO标题: xxx”单独一行输出在最前面。
+
 ## 输出格式要求：
 **请直接输出以下格式的markdown内容，不要添加任何其他文字：**
 
-## AI科技日报 {self.today}
+SEO标题: xxx
+
+# AI科技日报-{self.today}
+
 
 > 🤖 AI科技日报 | ⏰ 每日精选 | 🌐 全球资讯 | 🔬 前沿探索 | 💡 深度分析 | 🛠️ 开源创新 | 🚀 未来展望 | [🌍 网页版↗️]
 
@@ -211,7 +232,8 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 技术/方法名称（用**加粗**）
 - 技术原理和优势
 - 相关链接（论文地址、项目地址等）
-- 使用emoji增强可读性]
+- 使用emoji增强可读性
+- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
 
 ### 开源TOP项目
 
@@ -220,7 +242,8 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 项目简介和特色功能
 - GitHub星数（如适用）
 - 项目地址链接
-- 使用emoji增强可读性]
+- 使用emoji增强可读性
+- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
 
 ### 社媒分享
 
@@ -229,7 +252,8 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 核心观点和见解
 - 相关链接
 - 图片链接（如适用）
-- 使用emoji增强可读性]
+- 使用emoji增强可读性
+- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
 
 ---
 
@@ -245,7 +269,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             import os
             from datetime import datetime
             os.makedirs("data/outputs", exist_ok=True)
-            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # 修改为东八区
+            timestamp_str = datetime.now(ZoneInfo('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S")
             prompt_path = f"data/outputs/llm_prompt_{timestamp_str}.txt"
             with open(prompt_path, 'w', encoding='utf-8') as f:
                 f.write(prompt)
@@ -262,6 +288,23 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                 f.write(refined_content)
             logger.info(f"已保存大模型响应到: {response_path}")
 
+            # 自动提取SEO标题并插入到Markdown一级标题
+            import re
+            seo_title = None
+            lines = refined_content.splitlines()
+            for i, line in enumerate(lines):
+                m = re.match(r"SEO标题[:：]\s*(.+)", line)
+                if m:
+                    seo_title = m.group(1).strip()
+                    # 查找下一个一级标题
+                    for j in range(i+1, len(lines)):
+                        if lines[j].startswith("# AI科技日报-"):
+                            lines[j] = f"# AI科技日报-{self.today} {seo_title}"
+                            break
+                    # 移除SEO标题行
+                    lines.pop(i)
+                    break
+            refined_content = "\n".join(lines)
             return refined_content
 
         except Exception as e:
@@ -303,7 +346,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                 return False, "内容不是有效的markdown格式"
 
             # 检查是否包含标题
-            if "AI洞察日报" not in refined_content:
+            if "科技日报" not in refined_content:
                 return False, "缺少日报标题"
 
             # 检查内容长度
@@ -366,7 +409,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as temp_file:
                 temp_file.write(summary)
                 temp_summary_path = temp_file.name
-            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            # 修改为东八区
+            timestamp_str = datetime.now(ZoneInfo('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S")
             output_dir = os.path.join("data", "outputs")
             os.makedirs(output_dir, exist_ok=True)
             for i in range(1, draft_count + 1):
@@ -441,7 +486,9 @@ class PostMergeRefineProcessor(PostProcessorInterface):
                 # 保存预处理结果用于调试
                 outputs_dir = os.path.join("data", "outputs")
                 os.makedirs(outputs_dir, exist_ok=True)
-                timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                # timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                # 修改为东八区
+                timestamp_str = datetime.now(ZoneInfo('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S")
                 outputs_path = os.path.join(
                     outputs_dir, f"preprocessed_{timestamp_str}.md")
                 with open(outputs_path, 'w', encoding='utf-8') as f:
@@ -785,8 +832,11 @@ class LLMIntegrationAdapter:
         for i, item in enumerate(json_data, 1):
             title = item.get('title', '')
             related_ids = item.get('related_ids', [])
+            image_url = item.get('image_url', '')
 
             markdown_lines.append(f"## ** {i:02d} {title} **")
+            if image_url:
+                markdown_lines.append(f"![配图]({image_url})")
             if related_ids:
                 markdown_lines.append(f"- 相关ID: {related_ids}")
             markdown_lines.append("")

@@ -20,6 +20,14 @@ except ImportError:
     CRAWL4AI_AVAILABLE = False
     logger.warning("无法导入crawl4ai集成模块，将使用传统方法")
 
+# 导入图片提取模块
+try:
+    from utils.image_extractor import extract_first_image_from_content, extract_image_from_feed_entry
+    IMAGE_EXTRACTOR_AVAILABLE = True
+except ImportError:
+    IMAGE_EXTRACTOR_AVAILABLE = False
+    logger.warning("无法导入图片提取模块，将跳过图片提取")
+
 
 def extract_rss_entry(entry: Any, feed: Any = None, feed_url: str = "") -> Dict[str, Any]:
     """
@@ -39,7 +47,8 @@ def extract_rss_entry(entry: Any, feed: Any = None, feed_url: str = "") -> Dict[
         "author": "未知作者",
         "published": "",
         "content": "",
-        "summary": ""
+        "summary": "",
+        "image_url": ""  # 新增：图片URL字段
     }
     
     # 1. 提取标题
@@ -65,6 +74,10 @@ def extract_rss_entry(entry: Any, feed: Any = None, feed_url: str = "") -> Dict[
     
     # 7. 提取摘要
     result["summary"] = _extract_summary(entry)
+    
+    # 8. 提取图片URL（新增）
+    if IMAGE_EXTRACTOR_AVAILABLE:
+        result["image_url"] = _extract_image_url(entry, result["link"], result["content"])
     
     return result
 
@@ -386,3 +399,61 @@ def _extract_summary(entry: Any) -> str:
                 return desc
     
     return summary
+
+
+def _extract_image_url(entry: Any, article_url: str, content: str) -> str:
+    """
+    从RSS条目中提取图片URL
+    
+    参数:
+        entry: RSS条目
+        article_url: 文章链接
+        content: 文章内容
+        
+    返回:
+        图片URL，如果没有找到则返回空字符串
+    """
+    try:
+        # 1. 首先尝试从feedparser的enclosures中提取
+        if hasattr(entry, 'enclosures') and entry.enclosures:
+            for enclosure in entry.enclosures:
+                if hasattr(enclosure, 'type') and enclosure.type.startswith('image/'):
+                    if hasattr(enclosure, 'href'):
+                        logger.info(f"从RSS enclosures中提取到图片: {enclosure.href}")
+                        return enclosure.href
+        
+        # 2. 尝试从media:content中提取
+        if hasattr(entry, 'media_content') and entry.media_content:
+            for media in entry.media_content:
+                if hasattr(media, 'type') and media.type.startswith('image/'):
+                    if hasattr(media, 'url'):
+                        logger.info(f"从RSS media:content中提取到图片: {media.url}")
+                        return media.url
+        
+        # 3. 尝试从content中提取图片
+        if content:
+            image_url = extract_first_image_from_content(content, article_url, "html")
+            if image_url:
+                logger.info(f"从文章内容中提取到图片: {image_url}")
+                return image_url
+        
+        # 4. 尝试从summary中提取图片
+        if hasattr(entry, 'summary') and entry.summary:
+            image_url = extract_first_image_from_content(entry.summary, article_url, "html")
+            if image_url:
+                logger.info(f"从文章摘要中提取到图片: {image_url}")
+                return image_url
+        
+        # 5. 尝试从description中提取图片
+        if hasattr(entry, 'description') and entry.description:
+            image_url = extract_first_image_from_content(entry.description, article_url, "html")
+            if image_url:
+                logger.info(f"从文章描述中提取到图片: {image_url}")
+                return image_url
+        
+        logger.debug(f"未能在RSS条目中找到图片: {entry.get('title', '无标题')}")
+        return ""
+        
+    except Exception as e:
+        logger.warning(f"提取图片URL时发生错误: {str(e)}")
+        return ""

@@ -59,62 +59,62 @@ RSS_DAYS = int(os.getenv('RSS_DAYS', '1'))
 
 # RSS源列表
 RSS_FEEDS = [
-    # {
-    #     'name': 'OpenAI Blog',
-    #     'url': 'https://openai.com/blog/rss.xml'
-    # },
-    # {
-    #     'name': '机器之心',
-    #     'url': 'https://www.jiqizhixin.com/rss'
-    # },
-    # {
-    #     'name': '极客公园',
-    #     'url': 'http://www.geekpark.net/rss'
-    # },
-    # {
-    #     'name': 'Google DeepMind',
-    #     'url': 'https://deepmind.google/blog/rss.xml'
-    # },
-    # {
-    #     'name': '量子位',
-    #     'url': 'https://www.qbitai.com/feed'
-    # },
-    # {
-    #     'name': 'InfoQ',
-    #     'url': 'https://www.infoq.cn/feed'
-    # },
-    # {
-    #     'name': 'MarkTechPost',
-    #     'url': 'https://marktechpost.com/feed'
-    # },
-    # {
-    #     'name': 'Meta Research',
-    #     'url': 'https://research.facebook.com/feed/'
-    # },
-    # {
-    #     'name': 'VentureBeat',
-    #     'url': 'https://venturebeat.com/category/ai/feed/'
-    # },
-    # {
-    #     'name': 'AI news',
-    #     'url': 'https://www.artificialintelligence-news.com/feed/'
-    # },
-    # {
-    #     'name': 'Wired',
-    #     'url': 'https://www.wired.com/feed/tag/ai/latest/rss'
-    # },
-    # {
-    #     'name': 'Bloomberg',
-    #     'url': 'https://feeds.bloomberg.com/technology/news.rss'
-    # },
-    # {
-    #     'name': 'TechCrunch',
-    #     'url': 'https://techcrunch.com/category/artificial-intelligence/feed/'
-    # },
-    # {
-    #     'name': 'huggingface',
-    #     'url': 'https://huggingface.co/blog/feed.xml'
-    # },
+    {
+        'name': 'OpenAI Blog',
+        'url': 'https://openai.com/blog/rss.xml'
+    },
+    {
+        'name': '机器之心',
+        'url': 'https://www.jiqizhixin.com/rss'
+    },
+    {
+        'name': '极客公园',
+        'url': 'http://www.geekpark.net/rss'
+    },
+    {
+        'name': 'Google DeepMind',
+        'url': 'https://deepmind.google/blog/rss.xml'
+    },
+    {
+        'name': '量子位',
+        'url': 'https://www.qbitai.com/feed'
+    },
+    {
+        'name': 'InfoQ',
+        'url': 'https://www.infoq.cn/feed'
+    },
+    {
+        'name': 'MarkTechPost',
+        'url': 'https://marktechpost.com/feed'
+    },
+    {
+        'name': 'Meta Research',
+        'url': 'https://research.facebook.com/feed/'
+    },
+    {
+        'name': 'VentureBeat',
+        'url': 'https://venturebeat.com/category/ai/feed/'
+    },
+    {
+        'name': 'AI news',
+        'url': 'https://www.artificialintelligence-news.com/feed/'
+    },
+    {
+        'name': 'Wired',
+        'url': 'https://www.wired.com/feed/tag/ai/latest/rss'
+    },
+    {
+        'name': 'Bloomberg',
+        'url': 'https://feeds.bloomberg.com/technology/news.rss'
+    },
+    {
+        'name': 'TechCrunch',
+        'url': 'https://techcrunch.com/category/artificial-intelligence/feed/'
+    },
+    {
+        'name': 'huggingface',
+        'url': 'https://huggingface.co/blog/feed.xml'
+    },
     {
         'name': 'TechSpot',
         'url': 'https://www.techspot.com/backend.xml'
@@ -312,10 +312,10 @@ RSS_FEEDS = [
         "name": "公众号-PaperWeekly",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3201788143.atom"
     },
-    {
-        "name": "公众号-MacTalk",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_2398460220.atom"
-    },
+    # {
+    #     "name": "公众号-MacTalk",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_2398460220.atom"
+    # },
     {
         "name": "公众号-李继刚",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3913757353.atom"
@@ -324,10 +324,10 @@ RSS_FEEDS = [
         "name": "公众号-歸藏的AI工具箱",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3540975510.atom"
     },
-    {
-        "name": "公众号-谷歌开发者",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3008689962.atom"
-    },
+    # {
+    #     "name": "公众号-谷歌开发者",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3008689962.atom"
+    # },
     {
         "name": "公众号-EverAI酱",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3099987471.atom"
@@ -344,10 +344,10 @@ RSS_FEEDS = [
         "name": "公众号-极客公园",
         "url": "https://werss.tuber.cc/feed/MP_WXS_1304308441.atom"
     },
-    {
-        "name": "公众号-Hugging Face",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3940425683.atom"
-    },
+    # {
+    #     "name": "公众号-Hugging Face",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3940425683.atom"
+    # },
     {
         "name": "公众号-海外独角兽",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3869640945.atom"
@@ -372,10 +372,10 @@ RSS_FEEDS = [
         "name": "公众号-AI生活研究所",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3013745912.atom"
     },
-    {
-        "name": "公众号-AI前线",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3554086560.atom"
-    },
+    # {
+    #     "name": "公众号-AI前线",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3554086560.atom"
+    # },
     {
         "name": "公众号-AI科技评论",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3098132220.atom"
@@ -392,22 +392,22 @@ RSS_FEEDS = [
         "name": "公众号-AI产品榜",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3099356578.atom"
     },
-    {
-        "name": "公众号-InfoQ",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_2390142780.atom"
-    },
-    {
-        "name": "公众号-新智元",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3271041950.atom"
-    },
-    {
-        "name": "公众号-机器之心",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3073282833.atom"
-    },
-    {
-        "name": "公众号-量子位",
-        "url": "https://werss.tuber.cc/feed/MP_WXS_3236757533.atom"
-    },
+    # {
+    #     "name": "公众号-InfoQ",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_2390142780.atom"
+    # },
+    # {
+    #     "name": "公众号-新智元",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3271041950.atom"
+    # },
+    # {
+    #     "name": "公众号-机器之心",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3073282833.atom"
+    # },
+    # {
+    #     "name": "公众号-量子位",
+    #     "url": "https://werss.tuber.cc/feed/MP_WXS_3236757533.atom"
+    # },
     {
         "name": "公众号-数字生命卡兹克",
         "url": "https://werss.tuber.cc/feed/MP_WXS_3223096120.atom"

@@ -293,24 +293,26 @@ class GitHubUtils:
 
         return self.call_github_api("/pulls", 'POST', payload)
 
-    def publish_daily_summary(self, summary, context=None):
+    def publish_daily_summary(self, summary, context=None, path="daily"):
         """
         发布每日总结到GitHub
 
         Args:
             summary (str): 摘要内容
             context (dict): 上下文信息
+            path (str): 文件夹前缀，默认为"daily"
 
         Returns:
             bool: 是否成功
         """
         try:
             date_str = datetime.now().strftime('%Y-%m-%d')
+            month_str = datetime.now().strftime('%Y-%m')
             idx = 1
             if context and 'release_idx' in context:
                 idx = context['release_idx']
-            # 构建文件路径，增加_release后缀和编号
-            file_path = f"daily/{date_str}_release_{idx}.md"
+            # 构建文件路径，按月份分文件夹
+            file_path = f"{path}/{month_str}/{date_str}_release_{idx}.md"
             file_content = self._create_summary_content(
                 summary, context, date_str)
             existing_sha = self.get_file_sha(file_path)
@@ -346,7 +348,7 @@ class GitHubUtils:
             summary = '\n'.join(str(s) for s in summary)
         # 构建完整的markdown内容
         content_lines = [
-            f"# 科技日报 - {date_str}",
+            # f"# 科技日报 - {date_str}",
             "",
             summary
         ]

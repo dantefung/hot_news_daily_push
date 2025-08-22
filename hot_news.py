@@ -26,6 +26,7 @@ import re
 
 from bs4 import BeautifulSoup
 from dateutil import parser as date_parser
+from utils.utils import assign_image_url_to_items
 
 # 配置日志
 logging.basicConfig(
@@ -1207,11 +1208,17 @@ def main():
         logger.error("未收集到任何热点数据，程序退出")
         sys.exit(1)
 
+    # 自动补充 image_url 字段
+    assign_image_url_to_items(hotspots)
+
     # 保存原始热点数据
     save_hotspots_to_jsonl(hotspots)
 
     # 筛选最近的热点
     hotspots = filter_recent_hotspots(hotspots, args.filter_days)
+
+    # 自动补充 image_url 字段
+    assign_image_url_to_items(hotspots)
 
     # 保存筛选后的热点数据
     save_hotspots_to_jsonl(
@@ -1220,9 +1227,15 @@ def main():
     # 获取RSS文章
     rss_articles = fetch_rss_articles(args.rss_url, args.rss_days)
 
+    # 自动补充 image_url 字段
+    assign_image_url_to_items(rss_articles)
+
     # 合并热点和RSS文章
     all_content = hotspots + rss_articles
     logger.info(f"合并后共有 {len(all_content)} 条内容")
+
+    # 自动补充 image_url 字段
+    assign_image_url_to_items(all_content)
 
     # 保存合并后的数据
     save_hotspots_to_jsonl(

@@ -21,7 +21,8 @@ from config.config import (
 )
 
 # 导入工具函数
-from utils.utils import save_hotspots_to_jsonl, check_base_url, cleanup_old_files
+from utils.utils import save_hotspots_to_jsonl, check_base_url, cleanup_old_files, assign_image_url_to_items
+from utils.image_extractor import extract_first_image_from_content
 
 # 导入数据收集模块
 from crawler.data_collector import (
@@ -182,21 +183,28 @@ def safe_main():
 
     # 保存原始热点数据
     if hotspots:
+        assign_image_url_to_items(hotspots)
         save_hotspots_to_jsonl(
             hotspots, directory=os.path.join("data", "raw"))  # 指定 raw 目录
+        for item in hotspots:
+            logger.info(f"原始热点: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
 
     # 筛选最近的热点
     hotspots = filter_recent_hotspots(hotspots, filter_days)
 
     # 保存筛选后的热点数据
     if hotspots:
+        assign_image_url_to_items(hotspots)
         save_hotspots_to_jsonl(
             hotspots, directory=os.path.join("data", "filtered"))
+        for item in hotspots:
+            logger.info(f"筛选后热点: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
 
     # 获取RSS文章
     # 优先使用RSS_FEEDS列表，如果为空则使用单个RSS_URL
     rss_articles = fetch_rss_articles(
         rss_url=rss_url, days=rss_days, rss_feeds=RSS_FEEDS)
+    assign_image_url_to_items(rss_articles)
 
     # --- 新增：获取 Twitter Feed ---
     twitter_feed_raw = fetch_twitter_feed(days_to_fetch=2)  # 获取最近2天
@@ -229,6 +237,7 @@ def safe_main():
         logger.info(
             f"筛选后保留 {len(recent_tweets)}/{len(twitter_feed_raw)} 条最近24小时的推文。")
     # --- 结束：获取 Twitter Feed ---
+    assign_image_url_to_items(recent_tweets)
 
     # 给每个数据项添加来源类型标识
     for item in hotspots:
@@ -238,8 +247,10 @@ def safe_main():
     for item in recent_tweets:
         item['data_source_type'] = 'twitter'
 
+    # === 自动配图功能：为每条内容提取配图URL ===
     # 合并热点、RSS文章和过滤后的推文
     all_content = hotspots + rss_articles + recent_tweets  # 添加 recent_tweets
+    assign_image_url_to_items(all_content)
     logger.info(f"合并后共有 {len(all_content)} 条内容 (包括推文)")
 
     # 检查合并后是否有内容
@@ -255,6 +266,8 @@ def safe_main():
     # 保存合并后的数据
     save_hotspots_to_jsonl(
         all_content, directory=os.path.join("data", "merged"))
+    for item in all_content:
+        logger.info(f"合并内容: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
 
     # 获取网页内容并生成摘要
     if not skip_content:
@@ -384,6 +397,8 @@ def safe_main():
 
     deduplicated_content = list(seen_titles.values())
     logger.info(f"去重后剩余数量: {len(deduplicated_content)}")
+    for item in deduplicated_content:
+        logger.info(f"去重内容: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
     # --- 结束：去重逻辑 ---
 
     # --- 新增：保存最终处理和去重后的新闻列表 ---
@@ -400,6 +415,8 @@ def safe_main():
         with open(processed_filename, 'w', encoding='utf-8') as f:
             json.dump(deduplicated_content, f, ensure_ascii=False, indent=4)
         logger.info(f"成功将处理后的新闻列表保存到: {processed_filename}")
+        for item in deduplicated_content:
+            logger.info(f"保存内容: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
     except Exception as e:
         logger.error(f"保存处理后的新闻列表到 {processed_filename} 时出错: {str(e)}")
     # --- 结束：保存逻辑 ---
@@ -418,6 +435,9 @@ def safe_main():
         else:  # 默认使用 DeepSeek
             summary = summarize_with_deepseek(deduplicated_content, deepseek_key,
                                               deepseek_url, model_id, tech_only=tech_only)
+        logger.info(f"AI总结内容: {summary}")
+        for item in deduplicated_content:
+            logger.info(f"AI总结条目: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
 
         # 检查总结结果是否有效
         # 修改验证逻辑：使用更精确的错误检测，避免误判新闻内容中的关键词
@@ -516,6 +536,8 @@ def safe_main():
 
     # 推送阶段
     logger.info("开始推送阶段...")
+    for item in deduplicated_content:
+        logger.info(f"推送内容: {item.get('title', '')} | image_url: {item.get('image_url', '')}")
     try:
         # 使用多种方式推送消息
         success = notify(summary, tech_only)

@@ -31,7 +31,7 @@ async def process_hotspot_with_summary(hotspots, hunyuan_api_key, max_workers=5,
     """
     异步处理热点数据，获取网页内容并生成摘要
     优先使用API返回的摘要，没有摘要时才调用混元模型
-    同时尝试从网页内容中提取发布时间
+    同时尝试从网页内容中提取发布时间和图片URL
     如果tech_only为True，则只保留科技相关的内容
     支持缓存机制，避免重复处理相同内容
     处理后直接更新merged文件
@@ -64,6 +64,7 @@ async def process_hotspot_with_summary(hotspots, hunyuan_api_key, max_workers=5,
         desc = item.get("desc", "")
         content = item.get("content", "")
         html_content = None # Initialize html_content
+        image_url = item.get("image_url", "")  # 新增：图片URL字段
         summary_source = "原始提供" # Track where the summary came from
         
         # --- 1. Check if Initial Desc is Valid (Basic Check) ---
@@ -81,6 +82,7 @@ async def process_hotspot_with_summary(hotspots, hunyuan_api_key, max_workers=5,
 
         has_content = bool(content and len(content.strip()) > MIN_CONTENT_LENGTH_FOR_SUMMARY)
         has_timestamp = bool(item.get("timestamp") or item.get("time"))
+        has_image = bool(image_url)  # 新增：检查是否已有图片
 
         # Check if we need to extract time from HTML
         needs_time_extraction = item.get("needs_time_extraction", False)
@@ -89,7 +91,8 @@ async def process_hotspot_with_summary(hotspots, hunyuan_api_key, max_workers=5,
         # Need content fetch if we *don't* have a valid initial desc AND we *don't* have enough content already.
         needs_content = not has_valid_initial_desc and not has_content 
         needs_timestamp = not has_timestamp
-        needs_fetching = needs_content or needs_timestamp or needs_time_extraction
+        needs_image = not has_image  # 新增：如果需要图片但还没有
+        needs_fetching = needs_content or needs_timestamp or needs_time_extraction or needs_image
 
         # ---> ADD THIS CHECK FOR TWITTER <---
         source = item.get("source", "") # Get the source safely
@@ -105,15 +108,16 @@ async def process_hotspot_with_summary(hotspots, hunyuan_api_key, max_workers=5,
             log_reason = []
             if needs_content: log_reason.append("缺少内容/有效摘要")
             if needs_timestamp or needs_time_extraction: log_reason.append("缺少时间戳")
+            if needs_image: log_reason.append("缺少图片") # 新增：添加图片抓取原因
             logger.info(f"需要抓取网页 ({', '.join(log_reason)}): {title}")
             # Fetch both content and HTML if needed. 
             # If fetch fails, content might remain original, html_content might be None.
             try:
                 # 如果只需要时间提取而不需要内容，则只获取HTML
-                if (needs_timestamp or needs_time_extraction) and not needs_content:
-                    fetched_content, html_content = fetch_webpage_content(url, existing_content=content, fetch_html_only=True)
+                if (needs_timestamp or needs_time_extraction) and not needs_content and not needs_image:
+                    fetched_content, html_content, fetched_image_url = fetch_webpage_content(url, existing_content=content, fetch_html_only=True)
                 else:
-                    fetched_content, html_content = fetch_webpage_content(url, existing_content=content)
+                    fetched_content, html_content, fetched_image_url = fetch_webpage_content(url, existing_content=content)
                 
                 if fetched_content and fetched_content != content: # Update content only if fetch provided new content
                     logger.info(f"网页抓取成功，获取到新内容: {title}")
@@ -123,6 +127,13 @@ async def process_hotspot_with_summary(hotspots, hunyuan_api_key, max_workers=5,
                     logger.info(f"网页抓取成功，获取到HTML (内容未变或仅获取HTML): {title}")
                 else:
                      logger.warning(f"网页抓取未能获取到有效内容或HTML: {title}")
+                
+                # 处理图片URL
+                if fetched_image_url and not image_url:
+                    image_url = fetched_image_url
+                    has_image = True
+                    logger.info(f"从网页中提取到图片: {image_url}")
+                    
             except Exception as fetch_err:
                  logger.error(f"抓取网页时发生错误: {fetch_err}, URL: {url}")
                  # Keep original content, html_content remains None
