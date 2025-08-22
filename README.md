@@ -39,9 +39,10 @@
         - 如以上均失败，使用占位符 `[摘要无法生成：无内容或来源信息不足]`。
         - **长度控制**: 最终所有有效摘要（原始、AI生成、截断）都会被检查，超过150字符会被截断并添加 `...`。
 - **AI驱动的最终总结**：
-    - **多模型支持**：支持 DeepSeek 和 Google Gemini 两种总结模型，可通过环境变量切换。
+    - **多模型支持**：支持 Gemini（默认）、DeepSeek 和腾讯混元三种总结模型，可通过环境变量 `SUMMARY_MODEL` 切换。
     - 使用所选AI模型对去重和处理后的信息列表进行最终归纳总结。
     - **优化Prompt**：指导AI模型理解包含社交媒体信息，并合并内容相似的条目。
+    - **智能回退**：支持模型调用失败时的自动重试和错误处理。
 - **后置处理功能**：
     - **远程内容融合**：自动下载并融合来自其他项目的科技日报内容（如CloudFlare-AI-Insight-Daily、daily-tech-articles等）
     - **AI去重润色**：使用配置的AI模型对融合后的内容进行去重、合并和润色
@@ -336,9 +337,19 @@ context = {
 export TECH_ONLY=True
 python hot_news_main.py
 
-# 使用 Gemini 模型进行总结
+# 使用 Gemini 模型进行总结（默认）
 export SUMMARY_MODEL=gemini
 export GEMINI_API_KEY=your_gemini_api_key
+python hot_news_main.py
+
+# 使用 DeepSeek 模型进行总结
+export SUMMARY_MODEL=deepseek
+export DEEPSEEK_API_KEY=your_deepseek_api_key
+python hot_news_main.py
+
+# 使用腾讯混元模型进行总结
+export SUMMARY_MODEL=hunyuan
+export HUNYUAN_API_KEY=your_hunyuan_api_key
 python hot_news_main.py
 
 # 禁用腾讯混元摘要缓存 (强制重新生成)
@@ -378,9 +389,9 @@ python hot_news_main.py
 
 ### AI模型配置
 
-| 变量名          | 说明                              | 默认值     | 是否必需 |
-| --------------- | --------------------------------- | ---------- | -------- |
-| `SUMMARY_MODEL` | 总结模型选择 (deepseek 或 gemini) | `deepseek` | 否       |
+| 变量名          | 说明                                    | 默认值   | 是否必需 |
+| --------------- | --------------------------------------- | -------- | -------- |
+| `SUMMARY_MODEL` | 总结模型选择 (gemini/deepseek/hunyuan) | `gemini` | 否       |
 
 ### API密钥配置
 
@@ -392,7 +403,7 @@ python hot_news_main.py
 | `GEMINI_API_KEY`    | Google Gemini API密钥                 | **是** (当`SUMMARY_MODEL=gemini`时)   |
 | `GEMINI_BASE_URL`   | Gemini API代理端点URL                 | 否                                    |
 | `GEMINI_MODEL_NAME` | Gemini模型名称                        | 否                                    |
-| `HUNYUAN_API_KEY`   | 腾讯混元大模型API密钥                 | **是** (除非`SKIP_CONTENT=True`)      |
+| `HUNYUAN_API_KEY`   | 腾讯混元大模型API密钥                 | **是** (当`SUMMARY_MODEL=hunyuan`时或除非`SKIP_CONTENT=True`) |
 
 ### 推送渠道配置
 

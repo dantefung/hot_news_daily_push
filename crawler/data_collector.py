@@ -547,7 +547,7 @@ def fetch_rss_articles(rss_url=None, days=1, rss_feeds=None):
                     continue
                 
                 logger.info(f"正在获取RSS源: {feed_name} ({feed_url})")
-                max_retries = 3
+                max_retries = 1
                 retry_count = 0
                 retry_delay = 5  # 初始重试延迟（秒）
                 

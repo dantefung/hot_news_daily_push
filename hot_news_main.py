@@ -15,7 +15,7 @@ from distutils.util import strtobool
 # 导入配置
 from config.config import (
     TECH_SOURCES, ALL_SOURCES, WEBHOOK_URL, DEEPSEEK_API_KEY,
-    HUNYUAN_API_KEY, GEMINI_API_KEY, SUMMARY_MODEL, GEMINI_MODEL_NAME, GEMINI_BASE_URL,
+    HUNYUAN_API_KEY, GEMINI_API_KEY, ZHIPU_API_KEY, SUMMARY_MODEL, GEMINI_MODEL_NAME, GEMINI_BASE_URL,
     BASE_URL, DEEPSEEK_API_URL, DEEPSEEK_MODEL_ID,
     RSS_URL, RSS_DAYS, TITLE_LENGTH, MAX_WORKERS, FILTER_DAYS, RSS_FEEDS
 )
@@ -38,6 +38,8 @@ from processor.github_publisher import create_github_publisher
 # 导入LLM集成模块
 from llm_integration.deepseek_integration import summarize_with_deepseek
 from llm_integration.gemini_integration import summarize_with_gemini
+from llm_integration.hunyuan_integration import summarize_with_hunyuan
+from llm_integration.zhipu_integration import summarize_with_zhipu
 
 # 导入通知模块
 from notification.webhook_sender import notify, send_to_webhook
@@ -62,6 +64,7 @@ def safe_main():
     deepseek_key = os.getenv('DEEPSEEK_API_KEY', DEEPSEEK_API_KEY)
     hunyuan_key = os.getenv('HUNYUAN_API_KEY', HUNYUAN_API_KEY)
     gemini_key = os.getenv('GEMINI_API_KEY', GEMINI_API_KEY)
+    zhipu_key = os.getenv('ZHIPU_API_KEY', ZHIPU_API_KEY)
     summary_model = os.getenv('SUMMARY_MODEL', SUMMARY_MODEL).lower()
     gemini_model_name = os.getenv('GEMINI_MODEL_NAME', GEMINI_MODEL_NAME)
     gemini_base_url = os.getenv('GEMINI_BASE_URL', GEMINI_BASE_URL)
@@ -95,6 +98,16 @@ def safe_main():
             config_errors.append("选择了DeepSeek总结模型但未提供API Key")
         else:
             logger.info("使用DeepSeek模型进行总结")
+    elif summary_model == 'hunyuan':
+        if not hunyuan_key:
+            config_errors.append("选择了腾讯混元总结模型但未提供API Key")
+        else:
+            logger.info("使用腾讯混元模型进行总结")
+    elif summary_model == 'zhipu':
+        if not zhipu_key:
+            config_errors.append("选择了智谱清言总结模型但未提供API Key")
+        else:
+            logger.info("使用智谱清言模型进行总结")
     else:
         config_errors.append(f"不支持的总结模型: {summary_model}")
 
@@ -112,7 +125,8 @@ def safe_main():
                 "有WEBHOOK_URL": bool(webhook),
                 "有DEEPSEEK_API_KEY": bool(deepseek_key),
                 "有GEMINI_API_KEY": bool(gemini_key),
-                "有HUNYUAN_API_KEY": bool(hunyuan_key)
+                "有HUNYUAN_API_KEY": bool(hunyuan_key),
+                "有ZHIPU_API_KEY": bool(zhipu_key)
             }
         }
         notify_critical_error(
@@ -397,6 +411,10 @@ def safe_main():
         if summary_model == 'gemini':
             summary = summarize_with_gemini(deduplicated_content, gemini_key,
                                             gemini_model_name, gemini_base_url, tech_only=tech_only)
+        elif summary_model == 'hunyuan':
+            summary = summarize_with_hunyuan(deduplicated_content, hunyuan_key, tech_only=tech_only)
+        elif summary_model == 'zhipu':
+            summary = summarize_with_zhipu(deduplicated_content, zhipu_key, tech_only=tech_only)
         else:  # 默认使用 DeepSeek
             summary = summarize_with_deepseek(deduplicated_content, deepseek_key,
                                               deepseek_url, model_id, tech_only=tech_only)
