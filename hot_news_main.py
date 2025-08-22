@@ -130,6 +130,7 @@ def safe_main():
                 "有ZHIPU_API_KEY": bool(zhipu_key)
             }
         }
+        logger.error(f"配置错误: {error_details}")
         notify_critical_error(
             "配置错误",
             f"检测到 {len(config_errors)} 个配置问题，程序无法启动",
