@@ -27,6 +27,7 @@ on:
           - gemini
           - deepseek
           - hunyuan
+          - zhipu
 
 env:
   # 设置时区为北京时间

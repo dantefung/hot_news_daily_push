@@ -546,6 +546,9 @@ class LLMIntegrationAdapter:
             elif self.llm_type == "hunyuan":
                 from llm_integration.hunyuan_integration import summarize_with_hunyuan
                 self.llm_func = summarize_with_hunyuan
+            elif self.llm_type == "zhipu":
+                from llm_integration.zhipu_integration import summarize_with_zhipu
+                self.llm_func = summarize_with_zhipu
             else:
                 raise ValueError(f"不支持的LLM类型: {self.llm_type}")
 
@@ -577,6 +580,8 @@ class LLMIntegrationAdapter:
                 return self._refine_with_deepseek(prompt)
             elif self.llm_type == "hunyuan":
                 return self._refine_with_hunyuan(prompt)
+            elif self.llm_type == "zhipu":
+                return self._refine_with_zhipu(prompt)
             else:
                 logger.error(f"不支持的LLM类型: {self.llm_type}")
                 return prompt
@@ -701,8 +706,8 @@ class LLMIntegrationAdapter:
         from config.config import HUNYUAN_API_KEY
 
         try:
-            # 混元API配置
-            api_url = "https://hunyuan.tencentcloudapi.com/"
+            # 混元API配置 - 使用正确的API端点
+            api_url = "https://api.hunyuan.cloud.tencent.com/v1/chat/completions"
 
             headers = {
                 "Content-Type": "application/json",
@@ -710,6 +715,7 @@ class LLMIntegrationAdapter:
             }
 
             payload = {
+                "model": "hunyuan-lite",
                 "messages": [
                     {
                         "role": "user",
@@ -745,6 +751,57 @@ class LLMIntegrationAdapter:
         except Exception as e:
             logger.error(f"混元润色失败: {e}")
             return f"混元润色失败: {e}"
+
+    def _refine_with_zhipu(self, prompt: str) -> str:
+        """使用智谱AI进行润色"""
+        import requests
+        from config.config import ZHIPU_API_KEY, ZHIPU_TIMEOUT
+
+        try:
+            # 智谱AI API配置
+            api_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+            model_id = "glm-4.5-flash"  # 使用智谱AI的模型
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {ZHIPU_API_KEY}"
+            }
+
+            payload = {
+                "model": model_id,
+                "messages": [
+                    {"role": "system", "content": "你是一个专业的科技新闻编辑，擅长对科技日报内容进行去重、融合和润色。"},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 50000
+            }
+
+            logger.info(f"正在调用智谱AI API 进行润色，模型: {model_id}，端点: {api_url}")
+
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json=payload,
+                timeout=ZHIPU_TIMEOUT,  # 使用配置文件中的超时设置
+                proxies=proxies if use_proxies else None  # 根据条件使用代理
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            logger.info(f"智谱AI API 润色响应状态码: {response.status_code}")
+
+            if "choices" in result and len(result["choices"]) > 0:
+                content = result["choices"][0]["message"]["content"]
+                # 清理markdown代码块标记
+                return self._clean_markdown_blocks(content)
+
+            return "智谱AI润色失败：无法解析响应"
+
+        except Exception as e:
+            logger.error(f"智谱AI润色失败: {e}")
+            return f"智谱AI润色失败: {e}"
 
     def _clean_markdown_blocks(self, content: str) -> str:
         """
@@ -854,7 +911,7 @@ def create_llm_adapter(llm_type: str = "gemini") -> LLMIntegrationAdapter:
     Returns:
         LLMIntegrationAdapter: LLM适配器实例
     """
-    from config.config import GEMINI_API_KEY, DEEPSEEK_API_KEY, HUNYUAN_API_KEY
+    from config.config import GEMINI_API_KEY, DEEPSEEK_API_KEY, HUNYUAN_API_KEY, ZHIPU_API_KEY
 
     if llm_type == "gemini":
         return LLMIntegrationAdapter(
@@ -870,6 +927,11 @@ def create_llm_adapter(llm_type: str = "gemini") -> LLMIntegrationAdapter:
         return LLMIntegrationAdapter(
             llm_type="hunyuan",
             api_key=HUNYUAN_API_KEY
+        )
+    elif llm_type == "zhipu":
+        return LLMIntegrationAdapter(
+            llm_type="zhipu",
+            api_key=ZHIPU_API_KEY
         )
     else:
         raise ValueError(f"不支持的LLM类型: {llm_type}")

@@ -17,6 +17,10 @@ HUNYUAN_API_KEY = os.getenv('HUNYUAN_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 ZHIPU_API_KEY = os.getenv('ZHIPU_API_KEY')
 
+# 智谱AI配置
+ZHIPU_TIMEOUT = int(os.getenv('ZHIPU_TIMEOUT', '180'))  # 默认3分钟超时
+ZHIPU_MAX_RETRIES = int(os.getenv('ZHIPU_MAX_RETRIES', '3'))  # 默认重试3次
+
 # GitHub 配置
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN', '')
 GITHUB_REPO_OWNER = os.getenv('GITHUB_REPO_OWNER', 'dantefung')

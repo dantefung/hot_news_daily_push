@@ -17,13 +17,18 @@ from utils.utils import format_title_for_display
 # 配置日志
 logger = logging.getLogger(__name__)
 
-def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=3, tech_only=False):
+def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tech_only=False):
     """
     使用智谱清言 API对热点进行汇总归类，支持重试
     根据tech_only参数使用不同的prompt
     """
+    from config.config import ZHIPU_TIMEOUT, ZHIPU_MAX_RETRIES
+    
     if model_id is None:
         model_id = "glm-4.5-flash"
+    
+    if max_retries is None:
+        max_retries = ZHIPU_MAX_RETRIES
 
     retry_count = 0
     while retry_count < max_retries:
@@ -127,7 +132,7 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=3, tech_o
                 "https://open.bigmodel.cn/api/paas/v4/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=60
+                timeout=ZHIPU_TIMEOUT  # 使用配置文件中的超时设置
             )
 
             response.raise_for_status()
