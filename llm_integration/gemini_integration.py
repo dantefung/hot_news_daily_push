@@ -462,8 +462,9 @@ def test_gemini_connection(api_key, model_name="gemini-2.0-flash-exp", base_url=
         return False, str(e) 
 
 def main():
-    api_key = "AIzaSyDAqrscbINAOjb9xXW_Mbas8gDrtBBCK-U"  # 请替换为实际的API密钥
+    api_key = "testxxxxxxxxxx"  # 请替换为实际的API密钥
     model_name = "gemini-2.0-flash"
+    # model_name = "gemini-2.0-pro"
     # base_url = "https://generativelanguage.googleapis.com"
     base_url = "https://api-proxy.me/gemini"
     success, message = test_gemini_connection(api_key, model_name, base_url)
