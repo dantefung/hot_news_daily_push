@@ -36,7 +36,7 @@ env:
   # 基础配置
   TECH_ONLY: ${{ github.event.inputs.tech_only || 'false' }}
   SKIP_CONTENT: ${{ github.event.inputs.skip_content || 'false' }}
-  SUMMARY_MODEL: ${{ github.event.inputs.summary_model || 'gemini' }}
+  SUMMARY_MODEL: ${{ github.event.inputs.summary_model || 'zhipu' }}
 
   # 启用后置处理
   ENABLE_POST_PROCESS: "true"
