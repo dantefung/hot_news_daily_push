@@ -8,9 +8,9 @@
 import json
 import logging
 import time
-from langchain.chains import LLMChain
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
+from llm_integration.compat import LLMChain
 
 from utils.utils import get_content_hash, load_summary_cache, save_summary_cache
 
@@ -74,12 +74,10 @@ def summarize_with_tencent_hunyuan(content, api_key, title="", max_retries=3, us
                     """
             )
             
-            # 创建LLMChain
+            # 使用兼容层的 LLMChain（旧风格 API）
             chain = LLMChain(llm=llm, prompt=prompt)
-            
-            # 调用模型
-            response = chain.invoke({"content": content[:2000], "title": title})  # 限制输入长度
-            
+            # 调用模型（限制输入长度）
+            response = chain.invoke({"content": content[:2000], "title": title})
             result_text = response.get("text", "").strip()
             
             # 尝试解析JSON
@@ -221,9 +219,8 @@ def summarize_with_hunyuan(hotspots, api_key, max_retries=3, tech_only=False):
                 template="{prompt}"
             )
             
-            # 创建LLMChain
+            # 使用兼容层的 LLMChain（旧风格 API）
             chain = LLMChain(llm=llm, prompt=prompt_template)
-            
             # 调用模型
             response = chain.invoke({"prompt": prompt})
             result_text = response.get("text", "").strip()
