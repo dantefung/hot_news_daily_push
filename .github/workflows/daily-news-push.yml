@@ -21,7 +21,7 @@ on:
       summary_model:
         description: "AI总结模型选择"
         required: false
-        default: "gemini"
+        default: "zhipu"
         type: choice
         options:
           - gemini
