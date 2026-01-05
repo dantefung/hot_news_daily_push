@@ -28,6 +28,7 @@ on:
           - deepseek
           - hunyuan
           - zhipu
+          - nvidia
 
 env:
   # 设置时区为北京时间
@@ -122,6 +123,7 @@ jobs:
           HUNYUAN_API_KEY: ${{ secrets.HUNYUAN_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           BASE_URL: ${{ secrets.BASE_URL }}
           GEMINI_MODEL_NAME: ${{ secrets.GEMINI_MODEL_NAME }}
           GEMINI_BASE_URL: ${{ secrets.GEMINI_BASE_URL }}

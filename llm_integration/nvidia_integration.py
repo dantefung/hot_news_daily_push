@@ -2,33 +2,41 @@
 # -*- coding: utf-8 -*-
 
 """
-智谱清言日报信息总结：调用智谱清言对当日热点进行总结
+NVIDIA AI日报信息总结：调用NVIDIA AI对当日热点进行总结
 """
 
 import os
+import sys
 import json
 import time
 import logging
 import requests
+import base64
 from datetime import datetime
+import traceback
+
+# 添加项目根目录到Python路径，确保模块导入正常工作
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
 from config.config import SOURCE_NAME_MAP
 from utils.utils import format_title_for_display
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
-def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tech_only=False):
+def summarize_with_nvidia(hotspots, api_key, model_id=None, max_retries=None, tech_only=False):
     """
-    使用智谱清言 API对热点进行汇总归类，支持重试
+    使用NVIDIA AI API对热点进行汇总归类，支持重试
     根据tech_only参数使用不同的prompt
     """
-    from config.config import ZHIPU_TIMEOUT, ZHIPU_MAX_RETRIES
+    from config.config import NVIDIA_TIMEOUT, NVIDIA_MAX_RETRIES
     
     if model_id is None:
-        model_id = "glm-4.5-flash"
+        model_id = "meta/llama-4-maverick-17b-128e-instruct"  # 默认使用示例中的模型
     
     if max_retries is None:
-        max_retries = ZHIPU_MAX_RETRIES
+        max_retries = NVIDIA_MAX_RETRIES
 
     retry_count = 0
     while retry_count < max_retries:
@@ -56,10 +64,10 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
             os.makedirs(save_directory, exist_ok=True)
             today = datetime.now().strftime("%Y-%m-%d")
             timestamp = datetime.now().strftime("%H-%M-%S")
-            input_filename = os.path.join(save_directory, f"zhipu_input_{today}_{timestamp}.json")
+            input_filename = os.path.join(save_directory, f"nvidia_input_{today}_{timestamp}.json")
             with open(input_filename, 'w', encoding='utf-8') as f:
                 f.write(hotspot_json)
-            logger.info(f"已保存智谱清言输入数据至 {input_filename}")
+            logger.info(f"已保存NVIDIA AI输入数据至 {input_filename}")
             
             # 根据tech_only参数选择不同的prompt
             if tech_only:
@@ -110,10 +118,13 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
                 只返回JSON数据，不要有任何额外说明。
                 """
 
-            # 调用智谱清言 API
+            # 调用NVIDIA AI API
+            stream = False  # Set to True if you want to stream responses
+            
             headers = {
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}"
+                "Accept": "text/event-stream" if stream else "application/json"
             }
 
             payload = {
@@ -123,23 +134,66 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
-                "max_tokens": 1000
+                "max_tokens": 1000,
+                "stream": stream,
+                "top_p": 1.00,
+                "frequency_penalty": 0.00,
+                "presence_penalty": 0.00
             }
 
             logger.info(
-                f"正在调用智谱清言 API，尝试次数: {retry_count + 1}/{max_retries}")
+                f"正在调用NVIDIA AI API，模型: {model_id}，尝试次数: {retry_count + 1}/{max_retries}")
+            
+            # 添加请求详细信息日志
+            logger.info(f"API请求URL: https://integrate.api.nvidia.com/v1/chat/completions")
+            logger.info(f"API请求头: {headers}")
+            logger.info(f"API请求体: {payload}")
+            
             response = requests.post(
-                "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                "https://integrate.api.nvidia.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=ZHIPU_TIMEOUT  # 使用配置文件中的超时设置
+                timeout=NVIDIA_TIMEOUT  # 使用配置文件中的超时设置
             )
 
+            # 添加响应详细信息日志
+            logger.info(f"API响应状态码: {response.status_code}")
+            logger.info(f"API响应头: {response.headers}")
+            
             response.raise_for_status()
-            result = response.json()
+            
+            # Handle streaming vs non-streaming responses
+            if stream:
+                # For streaming responses, collect all chunks
+                json_response = ""
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode("utf-8")
+                        if decoded_line.startswith("data: "):
+                            chunk_data = decoded_line[6:]
+                            if chunk_data != "[DONE]":
+                                chunk_json = json.loads(chunk_data)
+                                if "choices" in chunk_json and len(chunk_json["choices"]) > 0:
+                                    delta = chunk_json["choices"][0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    json_response += content
+                result = {"choices": [{"message": {"content": json_response}}]}
+            else:
+                # For non-streaming responses
+                result = response.json()
+                # Add detailed logging
+                logger.info(f"API响应内容: {response.text}")
+                logger.info(f"完整API响应: {result}")
 
-            # 提取回复内容
-            json_response = result["choices"][0]["message"]["content"]
+                # Check if response contains expected structure
+                if "choices" not in result or not result["choices"]:
+                    logger.error(f"API响应中缺少 'choices' 字段或为空: {result}")
+                    raise ValueError("API响应格式不正确，缺少choices字段")
+
+                # Extract response content
+                json_response = result["choices"][0]["message"]["content"]
+                
+            logger.info(f"API返回的消息内容: {json_response}")
 
             # 提取JSON部分
             json_str = json_response
@@ -147,23 +201,23 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
                 json_str = json_response.split(
                     "```json")[1].split("```")[0].strip()
 
-            # 保存智谱清言的完整响应结果
+            # 保存NVIDIA AI的完整响应结果
             output_directory = os.path.join("data", "outputs")
             os.makedirs(output_directory, exist_ok=True)
 
             # 保存原始响应
             raw_output_filename = os.path.join(
-                output_directory, f"zhipu_raw_response_{today}_{timestamp}.json")
+                output_directory, f"nvidia_raw_response_{today}_{timestamp}.json")
             with open(raw_output_filename, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
-            logger.info(f"已保存智谱清言原始响应至 {raw_output_filename}")
+            logger.info(f"已保存NVIDIA AI原始响应至 {raw_output_filename}")
 
             # 保存处理后的JSON输出
             output_filename = os.path.join(
-                output_directory, f"zhipu_output_{today}_{timestamp}.json")
+                output_directory, f"nvidia_output_{today}_{timestamp}.json")
             with open(output_filename, 'w', encoding='utf-8') as f:
                 f.write(json_str)
-            logger.info(f"已保存智谱清言输出数据至 {output_filename}")
+            logger.info(f"已保存NVIDIA AI输出数据至 {output_filename}")
 
             # 解析JSON
             try:
@@ -205,17 +259,40 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
                 return formatted_summary
 
             except json.JSONDecodeError as e:
-                logger.error(f"解析智谱清言返回的JSON失败: {str(e)}")
-                return f"解析智谱清言返回的JSON失败: {str(e)}"
+                logger.error(f"解析NVIDIA AI返回的JSON失败: {str(e)}")
+                logger.error(f"尝试解析的JSON字符串: {json_str}")
+                return f"解析NVIDIA AI返回的JSON失败: {str(e)}"
 
         except requests.exceptions.Timeout:
             retry_count += 1
             logger.warning(
-                f"智谱清言 API 请求超时，正在重试 ({retry_count}/{max_retries})...")
+                f"NVIDIA AI API 请求超时，正在重试 ({retry_count}/{max_retries})...")
             time.sleep(5)  # 等待5秒后重试
 
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"NVIDIA AI API HTTP错误: {str(e)}")
+            logger.error(f"响应内容: {response.text if 'response' in locals() else 'No response object'}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+                
+        except KeyError as e:
+            logger.error(f"处理NVIDIA AI响应时缺少键: {str(e)}")
+            logger.error(f"完整响应: {result if 'result' in locals() else 'No result object'}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+
         except Exception as e:
-            logger.error(f"调用智谱清言 API时发生错误: {str(e)}")
+            logger.error(f"调用NVIDIA AI API时发生错误: {str(e)}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             retry_count += 1
             if retry_count < max_retries:
                 logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
@@ -224,7 +301,7 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
                 break
 
     # 如果所有重试都失败，返回前20条热点作为备选
-    logger.warning("无法使用智谱清言 API归类热点，将使用原始热点")
+    logger.warning("无法使用NVIDIA AI API归类热点，将使用原始热点")
     fallback = ""
     for i, item in enumerate(hotspots[:10]):
         num = str(i + 1).zfill(2)
@@ -237,43 +314,47 @@ def summarize_with_zhipu(hotspots, api_key, model_id=None, max_retries=None, tec
     return fallback
 
 
-def refine_markdown_with_zhipu(prompt: str, api_key: str = None, model_id: str = None, max_retries: int = None) -> str:
+def refine_markdown_with_nvidia(prompt: str, api_key: str = None, model_id: str = None, max_retries: int = None) -> str:
     """
-    使用智谱清言API对内容进行润色
+    使用NVIDIA AI API对内容进行润色
     
     Args:
         prompt: 润色提示词
-        api_key: 智谱API密钥
+        api_key: NVIDIA API密钥
         model_id: 模型ID
         max_retries: 最大重试次数
     
     Returns:
         str: 润色后的内容
     """
-    from config.config import ZHIPU_API_KEY, ZHIPU_TIMEOUT, ZHIPU_MAX_RETRIES
+    from config.config import NVIDIA_API_KEY, NVIDIA_TIMEOUT, NVIDIA_MAX_RETRIES
     
-    # 优先使用传入的参数，否则使用配置文件中的
+    # 优先使用传入的API密钥，否则使用配置文件中的
     if not api_key:
-        api_key = ZHIPU_API_KEY
-    if not model_id:
-        model_id = "glm-4.5-flash"
-    if max_retries is None:
-        max_retries = ZHIPU_MAX_RETRIES
-
+        api_key = NVIDIA_API_KEY
+    
     if not api_key:
-        logger.error("未配置ZHIPU_API_KEY，请先设置API密钥")
+        logger.error("未配置NVIDIA_API_KEY，请先设置API密钥")
         return prompt
+    
+    if model_id is None:
+        model_id = "meta/llama-4-maverick-17b-128e-instruct"  # 使用示例中的模型
+    
+    if max_retries is None:
+        max_retries = NVIDIA_MAX_RETRIES
 
     retry_count = 0
     while retry_count < max_retries:
         try:
-            # 构建请求头
+            # 准备API请求
+            stream = False  # Set to True if you want to stream responses
+            
             headers = {
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}"
+                "Accept": "text/event-stream" if stream else "application/json"
             }
 
-            # 构建请求体
             payload = {
                 "model": model_id,
                 "messages": [
@@ -281,40 +362,95 @@ def refine_markdown_with_zhipu(prompt: str, api_key: str = None, model_id: str =
                     {"role": "user", "content": prompt}
                 ],
                 "temperature": 0.3,
-                "max_tokens": 50000
+                "max_tokens": 50000,
+                "stream": stream,
+                "top_p": 1.00,
+                "frequency_penalty": 0.00,
+                "presence_penalty": 0.00
             }
 
-            logger.info(f"正在调用智谱清言 API 进行润色，模型: {model_id}，尝试次数: {retry_count + 1}/{max_retries}")
+            logger.info(
+                f"正在调用NVIDIA AI API进行润色，模型: {model_id}，尝试次数: {retry_count + 1}/{max_retries}")
             
-            # 调用智谱清言 API
+            # 添加请求详细信息日志
+            logger.info(f"API请求URL: https://integrate.api.nvidia.com/v1/chat/completions")
+            logger.info(f"API请求头: {headers}")
+            logger.info(f"API请求体: {payload}")
+            
             response = requests.post(
-                "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                "https://integrate.api.nvidia.com/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=ZHIPU_TIMEOUT  # 使用配置文件中的超时设置
+                timeout=NVIDIA_TIMEOUT  # 使用配置文件中的超时设置
             )
 
             response.raise_for_status()
-            result = response.json()
+            
+            # Handle streaming vs non-streaming responses
+            if stream:
+                # For streaming responses, collect all chunks
+                refined_content = ""
+                for line in response.iter_lines():
+                    if line:
+                        decoded_line = line.decode("utf-8")
+                        if decoded_line.startswith("data: "):
+                            chunk_data = decoded_line[6:]
+                            if chunk_data != "[DONE]":
+                                chunk_json = json.loads(chunk_data)
+                                if "choices" in chunk_json and len(chunk_json["choices"]) > 0:
+                                    delta = chunk_json["choices"][0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    refined_content += content
+            else:
+                # For non-streaming responses
+                result = response.json()
+                # Add detailed logging
+                logger.info(f"API响应内容: {response.text}")
 
-            # 提取回复内容
-            refined_content = result["choices"][0]["message"]["content"]
+                # Check if response contains expected structure
+                if "choices" in result and len(result["choices"]) > 0:
+                    refined_content = result["choices"][0]["message"]["content"]
+                else:
+                    logger.error(f"API响应中缺少 'choices' 字段或为空: {result}")
+                    raise ValueError("API响应格式不正确，缺少choices字段")
 
-            logger.info(f"智谱清言API润色成功，内容长度: {len(refined_content)} 字符")
+            logger.info(f"NVIDIA API润色成功，内容长度: {len(refined_content)} 字符")
             
             # 清理代码块标记和确认语句
-            cleaned_content = _clean_markdown_blocks_zhipu(refined_content)
+            cleaned_content = _clean_markdown_blocks_nvidia(refined_content)
             
             return cleaned_content
 
         except requests.exceptions.Timeout:
             retry_count += 1
             logger.warning(
-                f"智谱清言 API 请求超时，正在重试 ({retry_count}/{max_retries})...")
+                f"NVIDIA AI API 请求超时，正在重试 ({retry_count}/{max_retries})...")
             time.sleep(5)  # 等待5秒后重试
 
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"NVIDIA AI API HTTP错误: {str(e)}")
+            logger.error(f"响应内容: {response.text if 'response' in locals() else 'No response object'}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+                
+        except KeyError as e:
+            logger.error(f"处理NVIDIA AI响应时缺少键: {str(e)}")
+            logger.error(f"完整响应: {result if 'result' in locals() else 'No result object'}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+
         except Exception as e:
-            logger.error(f"调用智谱清言 API进行润色时发生错误: {str(e)}")
+            logger.error(f"调用NVIDIA AI API进行润色时发生错误: {str(e)}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            logger.error(f"详细错误信息: {traceback.format_exc()}")
             retry_count += 1
             if retry_count < max_retries:
                 logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
@@ -323,11 +459,11 @@ def refine_markdown_with_zhipu(prompt: str, api_key: str = None, model_id: str =
                 break
 
     # 如果所有重试都失败，返回原始内容
-    logger.error(f"智谱清言 API润色失败，已达到最大重试次数 {max_retries}")
+    logger.warning("NVIDIA AI API润色失败，返回原始内容")
     return prompt
 
 
-def _clean_markdown_blocks_zhipu(content: str) -> str:
+def _clean_markdown_blocks_nvidia(content: str) -> str:
     """
     清理代码块标记和确认语句
 
@@ -341,6 +477,10 @@ def _clean_markdown_blocks_zhipu(content: str) -> str:
         return content
 
     # 移除开头的 ````
+    if content.startswith('````'):
+        content = content[4:]  # 移除 ````
+
+    # 移除开头的 ```
     if content.startswith('```'):
         content = content[3:]
 
@@ -378,16 +518,16 @@ def _clean_markdown_blocks_zhipu(content: str) -> str:
         ]):
             continue
 
-        # 如果遇到代码块，开始保留内容
-        if line.startswith('``'):
+        # 如果遇到代码标题，开始保留内容
+        if line.strip().startswith('#') or line.strip().startswith('##'):
             skip_until_markdown = False
 
-        # 如果还没有遇到代码块，跳过空行
+        # 如果还没有遇到代码标题，跳过空行
         if skip_until_markdown and not line.strip():
             continue
 
-        # 如果遇到代码块，标记开始保留内容
-        if line.startswith('``'):
+        # 如果遇到代码标题，标记开始保留内容
+        if line.strip().startswith('#') or line.strip().startswith('##'):
             skip_until_markdown = True
 
         if skip_until_markdown or line.strip():
@@ -398,7 +538,7 @@ def _clean_markdown_blocks_zhipu(content: str) -> str:
 
 def main():
     """
-    测试智谱清言API集成的主函数
+    测试NVIDIA AI API集成的主函数
     """
     import os
     
@@ -443,22 +583,22 @@ def main():
     ]
     
     # 从环境变量获取API密钥
-    api_key = os.getenv("ZHIPU_API_KEY")
+    api_key = os.getenv("NVIDIA_API_KEY")
     if not api_key:
-        logger.error("未设置ZHIPU_API_KEY环境变量，请先设置API密钥")
-        logger.info("设置方法: export ZHIPU_API_KEY='your_api_key_here'")
+        logger.error("未设置NVIDIA_API_KEY环境变量，请先设置API密钥")
+        logger.info("设置方法: export NVIDIA_API_KEY='your_api_key_here'")
         return
     
-    logger.info("开始测试智谱清言API集成...")
+    logger.info("开始测试NVIDIA AI API集成...")
     logger.info(f"测试数据包含 {len(test_hotspots)} 条热点信息")
     
     try:
         # 测试科技新闻模式
         logger.info("测试科技新闻模式 (tech_only=True)...")
-        result_tech = summarize_with_zhipu(
+        result_tech = summarize_with_nvidia(
             hotspots=test_hotspots,
             api_key=api_key,
-            model_id="glm-4.5-flash",
+            model_id="meta/llama-4-maverick-17b-128e-instruct",  # Using model from example
             max_retries=2,
             tech_only=True
         )
@@ -471,10 +611,10 @@ def main():
         # 测试全领域模式
         logger.info("\n" + "="*50)
         logger.info("测试全领域模式 (tech_only=False)...")
-        result_all = summarize_with_zhipu(
+        result_all = summarize_with_nvidia(
             hotspots=test_hotspots,
             api_key=api_key,
-            model_id="glm-4.5-flash",
+            model_id="meta/llama-4-maverick-17b-128e-instruct",  # Using model from example
             max_retries=2,
             tech_only=False
         )
@@ -488,9 +628,8 @@ def main():
         logger.info("所有测试完成!")
         
     except Exception as e:
-        logger.error(f"智谱清言API测试失败: {str(e)}")
+        logger.error(f"NVIDIA AI API测试失败: {str(e)}")
         logger.error(f"错误类型: {type(e).__name__}")
-        import traceback
         logger.error(f"详细错误信息: {traceback.format_exc()}")
 
 

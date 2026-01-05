@@ -461,6 +461,236 @@ def test_gemini_connection(api_key, model_name="gemini-2.0-flash-exp", base_url=
         logger.error(f"Gemini API连接测试失败: {str(e)}")
         return False, str(e) 
 
+
+def refine_markdown_with_gemini(prompt: str, api_key: str = None, model_name: str = "gemini-2.0-flash-exp", base_url: str = "https://gemini.kbz.ink", max_retries: int = 3) -> str:
+    """
+    使用Google Gemini API对文本内容进行润色
+    
+    Args:
+        prompt: 润色提示词
+        api_key: Gemini API密钥
+        model_name: 模型名称
+        base_url: API基础URL
+        max_retries: 最大重试次数
+    
+    Returns:
+        str: 润色后的内容
+    """
+    from config.config import GEMINI_API_KEY
+    
+    # 优先使用传入的API密钥，否则使用配置文件中的
+    if not api_key:
+        api_key = GEMINI_API_KEY
+    
+    if not api_key:
+        logger.error("未配置GEMINI_API_KEY，请先设置API密钥")
+        return prompt
+
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            # 构建API请求URL
+            api_url = f"{base_url.rstrip('/')}/v1beta/models/{model_name}:generateContent"
+            
+            # 构建请求头
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key
+            }
+            
+            # 构建请求体
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.3,
+                    "maxOutputTokens": 50000  # 增加token限制以避免截断
+                }
+            }
+            
+            logger.info(f"正在调用 Gemini API 进行润色，模型: {model_name}，端点: {api_url}，尝试次数: {retry_count + 1}/{max_retries}")
+            
+            # 调用Gemini API
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json=payload,
+                timeout=60,
+                proxies=proxies if use_proxies else None  # 根据条件使用代理
+            )
+            
+            response.raise_for_status()
+            result = response.json()
+            
+            # 添加详细的响应日志记录
+            logger.info(f"Gemini API 润色响应状态码: {response.status_code}")
+            logger.debug(f"Gemini API 润色完整响应: {json.dumps(result, ensure_ascii=False, indent=2)}")
+            
+            # 提取回复内容 - 改进的格式解析
+            refined_content = ""
+            if "candidates" in result and len(result["candidates"]) > 0:
+                candidate = result["candidates"][0]
+                logger.debug(f"润色候选响应结构: {json.dumps(candidate, ensure_ascii=False, indent=2)}")
+                
+                # 检查响应是否被截断
+                finish_reason = candidate.get("finishReason", "UNKNOWN")
+                if finish_reason == "MAX_TOKENS":
+                    logger.warning("⚠️  API响应因token限制被截断，尝试增加maxOutputTokens或简化输入")
+                
+                if "content" in candidate and "parts" in candidate["content"]:
+                    refined_content = candidate["content"]["parts"][0].get("text", "")
+                elif "text" in candidate:
+                    # 某些API版本可能直接在candidate中返回text
+                    refined_content = candidate["text"]
+                elif "output" in candidate:
+                    # 另一种可能的格式
+                    refined_content = candidate["output"]
+                else:
+                    logger.error(f"无法解析候选响应，可用字段: {list(candidate.keys())}")
+                    raise Exception(f"响应格式错误：candidate中无法找到文本内容，可用字段: {list(candidate.keys())}")
+                    
+                # 如果响应被截断且内容不完整，给出明确提示
+                if finish_reason == "MAX_TOKENS":
+                    logger.warning("响应可能因token限制被截断")
+                    
+            else:
+                logger.error(f"响应中无candidates字段，响应结构: {list(result.keys())}")
+                raise Exception(f"响应格式错误：无法找到candidates，响应字段: {list(result.keys())}")
+            
+            if not refined_content:
+                logger.error("提取的润色内容为空")
+                raise Exception("润色内容为空")
+            
+            logger.info(f"Gemini API润色成功，内容长度: {len(refined_content)} 字符")
+            
+            # 清理文本代码块标记和确认语句
+            cleaned_content = _clean_markdown_blocks_gemini(refined_content)
+            
+            return cleaned_content
+                
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 400:
+                # 检查是否是API密钥无效或地理位置限制错误
+                try:
+                    error_response = e.response.json()
+                    error_message = str(error_response)
+                    if "API_KEY_INVALID" in error_message or "API key not valid" in error_message:
+                        logger.error(f"Gemini API密钥无效: 请检查GEMINI_API_KEY是否正确")
+                        return "Gemini API密钥无效，请检查API密钥"
+                    elif "User location is not supported" in error_message:
+                        logger.error(f"Gemini API地理位置限制: 当前地区不支持API使用")
+                        return "Gemini API地理位置限制，当前地区不支持API使用，请尝试使用VPN"
+                except:
+                    pass
+                logger.error(f"Gemini API请求错误: {str(e)}")
+                return f"Gemini API请求错误: {str(e)}"
+            elif e.response.status_code == 401:
+                logger.error(f"Gemini API认证失败: 请检查API密钥")
+                return "Gemini API认证失败，请检查API密钥"
+            elif e.response.status_code == 403:
+                logger.error(f"Gemini API权限不足: {str(e)}")
+                return "Gemini API权限不足，请检查API密钥权限"
+            else:
+                logger.error(f"Gemini API HTTP错误: {str(e)}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                    time.sleep(5)
+                else:
+                    break
+        except Exception as e:
+            logger.error(f"调用Gemini API进行润色失败: {str(e)}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+    
+    logger.error(f"Gemini API润色失败，已达到最大重试次数 {max_retries}")
+    return prompt
+
+
+def _clean_markdown_blocks_gemini(content: str) -> str:
+    """
+    清理文本代码块标记和确认语句
+
+    Args:
+        content: 原始内容
+
+    Returns:
+        str: 清理后的内容
+    """
+    if not content:
+        return content
+
+    # 移除开头的 ``````
+    if content.startswith('``````'):
+        content = content[10:]  # 移除 ``````
+
+    # 移除开头的 ```
+    if content.startswith('```'):
+        content = content[3:]
+
+    # 移除结尾的 ```
+    if content.endswith('```'):
+        content = content[:-3]
+
+    # 移除开头的换行符
+    content = content.lstrip('\n')
+
+    # 移除结尾的换行符
+    content = content.rstrip('\n')
+
+    # 清理确认语句和无关内容
+    lines = content.split('\n')
+    cleaned_lines = []
+    skip_until_markdown = False
+
+    for line in lines:
+        # 跳过确认语句
+        if any(phrase in line for phrase in [
+            "好的，收到！",
+            "我将按照您的要求",
+            "对提供的科技日报内容进行",
+            "深度去重、融合、润色和结构优化",
+            "并按照指定的 Markdown 格式输出",
+            "好的，我明白了",
+            "我来帮您",
+            "我将为您",
+            "以下是",
+            "请查看以下内容",
+            "已按要求",
+            "已完成",
+            "根据您的要求"
+        ]):
+            continue
+
+        # 如果遇到文本标题，开始保留内容
+        if line.strip().startswith('#') or line.strip().startswith('##'):
+            skip_until_markdown = False
+
+        # 如果还没有遇到文本标题，跳过空行
+        if skip_until_markdown and not line.strip():
+            continue
+
+        # 如果遇到文本标题，标记开始保留内容
+        if line.strip().startswith('#') or line.strip().startswith('##'):
+            skip_until_markdown = True
+
+        if skip_until_markdown or line.strip():
+            cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines)
+
+
 def main():
     api_key = "testxxxxxxxxxx"  # 请替换为实际的API密钥
     model_name = "gemini-2.0-flash"

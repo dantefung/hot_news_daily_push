@@ -234,3 +234,167 @@ def summarize_with_deepseek(hotspots, api_key, api_url=None, model_id=None, max_
         fallback += f"## ** {num} {item['title']} **  \n"
         fallback += f"- [{item_title}]({item['url']}) `🏷️{source_name}` \n\n"
     return fallback
+
+
+def refine_markdown_with_deepseek(prompt: str, api_key: str = None, api_url: str = None, model_id: str = None, max_retries: int = 3) -> str:
+    """
+    使用Deepseek API对文本内容进行润色
+    
+    Args:
+        prompt: 润色提示词
+        api_key: Deepseek API密钥
+        api_url: API端点URL
+        model_id: 模型ID
+        max_retries: 最大重试次数
+    
+    Returns:
+        str: 润色后的内容
+    """
+    from config.config import DEEPSEEK_API_KEY, DEEPSEEK_API_URL, DEEPSEEK_MODEL_ID
+    
+    # 优先使用传入的参数，否则使用配置文件中的
+    if not api_key:
+        api_key = DEEPSEEK_API_KEY
+    if not api_url:
+        api_url = DEEPSEEK_API_URL or "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+    if not model_id:
+        model_id = DEEPSEEK_MODEL_ID or "ep-20250307234946-b2znq"
+    
+    if not api_key:
+        logger.error("未配置DEEPSEEK_API_KEY，请先设置API密钥")
+        return prompt
+
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            # 构建请求头
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+
+            # 构建请求体
+            payload = {
+                "model": model_id,
+                "messages": [
+                    {"role": "system", "content": "你是一个专业的科技新闻编辑，擅长对科技日报内容进行去重、融合和润色。"},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 50000
+            }
+
+            logger.info(f"正在调用 Deepseek API 进行润色，模型: {model_id}，端点: {api_url}，尝试次数: {retry_count + 1}/{max_retries}")
+            
+            # 调用Deepseek API
+            response = requests.post(
+                api_url,
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+
+            response.raise_for_status()
+            result = response.json()
+
+            # 提取回复内容
+            refined_content = result["choices"][0]["message"]["content"]
+
+            logger.info(f"Deepseek API润色成功，内容长度: {len(refined_content)} 字符")
+            
+            # 清理代码块标记和确认语句
+            cleaned_content = _clean_markdown_blocks_deepseek(refined_content)
+            
+            return cleaned_content
+
+        except requests.exceptions.Timeout:
+            retry_count += 1
+            logger.warning(
+                f"Deepseek API 请求超时，正在重试 ({retry_count}/{max_retries})...")
+            time.sleep(5)  # 等待5秒后重试
+
+        except Exception as e:
+            logger.error(f"调用Deepseek API进行润色时发生错误: {str(e)}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+
+    # 如果所有重试都失败，返回原始内容
+    logger.error(f"Deepseek API润色失败，已达到最大重试次数 {max_retries}")
+    return prompt
+
+
+def _clean_markdown_blocks_deepseek(content: str) -> str:
+    """
+    清理代码块标记和确认语句
+
+    Args:
+        content: 原始内容
+
+    Returns:
+        str: 清理后的内容
+    """
+    if not content:
+        return content
+
+    # 移除开头的 ````
+    if content.startswith('````'):
+        content = content[4:]  # 移除 ````
+
+    # 移除开头的 ```
+    if content.startswith('```'):
+        content = content[3:]
+
+    # 移除结尾的 ```
+    if content.endswith('```'):
+        content = content[:-3]
+
+    # 移除开头的换行符
+    content = content.lstrip('\n')
+
+    # 移除结尾的换行符
+    content = content.rstrip('\n')
+
+    # 清理确认语句和无关内容
+    lines = content.split('\n')
+    cleaned_lines = []
+    skip_until_markdown = False
+
+    for line in lines:
+        # 跳过确认语句
+        if any(phrase in line for phrase in [
+            "好的，收到！",
+            "我将按照您的要求",
+            "对提供的科技日报内容进行",
+            "深度去重、融合、润色和结构优化",
+            "并按照指定的 Markdown 格式输出",
+            "好的，我明白了",
+            "我来帮您",
+            "我将为您",
+            "以下是",
+            "请查看以下内容",
+            "已按要求",
+            "已完成",
+            "根据您的要求"
+        ]):
+            continue
+
+        # 如果遇到代码块，开始保留内容
+        if line.startswith('``'):
+            skip_until_markdown = False
+
+        # 如果还没有遇到代码块，跳过空行
+        if skip_until_markdown and not line.strip():
+            continue
+
+        # 如果遇到代码块，标记开始保留内容
+        if line.startswith('``'):
+            skip_until_markdown = True
+
+        if skip_until_markdown or line.strip():
+            cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines)

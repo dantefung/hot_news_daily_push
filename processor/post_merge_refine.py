@@ -156,7 +156,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
             prompt = f"""
 你是一位专业的科技新闻编辑，请对以下合并的科技日报内容进行深度去重、融合和润色，并按照指定的格式输出。
 
-**重要：请直接输出markdown内容，不要添加任何确认语句、解释或前言。**
+**重要：请直接输出内容，不要添加任何确认语句、解释或前言。**
 
 **特别要求：资讯中如有配图（image_url 字段），必须在输出中保留并展示该配图，图片应与对应新闻条目关联。**
 
@@ -184,7 +184,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 
 ### 4. 结构优化
 - 按重要性和时效性排序
-- 使用清晰的markdown格式
+- 使用清晰的编码格式
 - 添加适当的分类和分组
 - 保持原文的链接信息
 
@@ -210,7 +210,7 @@ class PostMergeRefineProcessor(PostProcessorInterface):
 - 直接以“SEO标题: xxx”单独一行输出在最前面。
 
 ## 输出格式要求：
-**请直接输出以下格式的markdown内容，不要添加任何其他文字：**
+**请直接输出以下格式的编码内容，不要添加任何其他文字：**
 
 SEO标题: xxx
 
@@ -230,7 +230,7 @@ SEO标题: xxx
 - 技术原理和优势
 - 相关链接（论文地址、项目地址等）
 - 使用emoji增强可读性
-- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
+- **如有配图（image_url），请在对应条目下方用编码语法展示图片**]
 
 ### 开源TOP项目
 
@@ -240,7 +240,7 @@ SEO标题: xxx
 - GitHub星数（如适用）
 - 项目地址链接
 - 使用emoji增强可读性
-- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
+- **如有配图（image_url），请在对应条目下方用编码语法展示图片**]
 
 ### 社媒分享
 
@@ -250,7 +250,7 @@ SEO标题: xxx
 - 相关链接
 - 图片链接（如适用）
 - 使用emoji增强可读性
-- **如有配图（image_url），请在对应条目下方用markdown语法展示图片**]
+- **如有配图（image_url），请在对应条目下方用编码语法展示图片**]
 
 ---
 
@@ -260,7 +260,7 @@ SEO标题: xxx
 3. 保持原文的链接信息
 4. 按重要性合理排序
 5. 格式完全符合上述模板
-6. **直接输出markdown内容，不要添加任何确认语句或解释**
+6. **直接输出编码内容，不要添加任何确认语句或解释**
 """
             # 保存prompt到data/outputs目录
             import os
@@ -285,7 +285,7 @@ SEO标题: xxx
                 f.write(refined_content)
             logger.info(f"已保存大模型响应到: {response_path}")
 
-            # 自动提取SEO标题并插入到Markdown一级标题
+            # 自动提取SEO标题并插入到编码一级标题
             import re
             seo_title = None
             lines = refined_content.splitlines()
@@ -338,9 +338,9 @@ SEO标题: xxx
             if missing_sections:
                 return False, f"缺少必要的章节: {', '.join(missing_sections)}"
 
-            # 检查markdown格式
+            # 检查编码格式
             if not refined_content.startswith("##") and not refined_content.startswith("#"):
-                return False, "内容不是有效的markdown格式"
+                return False, "内容不是有效的编码格式"
 
             # 检查是否包含标题
             if "科技日报" not in refined_content:
@@ -546,6 +546,9 @@ class LLMIntegrationAdapter:
             elif self.llm_type == "zhipu":
                 from llm_integration.zhipu_integration import summarize_with_zhipu
                 self.llm_func = summarize_with_zhipu
+            elif self.llm_type == "nvidia":
+                from llm_integration.nvidia_integration import summarize_with_nvidia
+                self.llm_func = summarize_with_nvidia
             else:
                 raise ValueError(f"不支持的LLM类型: {self.llm_type}")
 
@@ -557,7 +560,7 @@ class LLMIntegrationAdapter:
 
     def refine_markdown(self, prompt: str) -> str:
         """
-        润色markdown内容
+        润色编码内容
 
         Args:
             prompt: 润色提示词
@@ -579,6 +582,8 @@ class LLMIntegrationAdapter:
                 return self._refine_with_hunyuan(prompt)
             elif self.llm_type == "zhipu":
                 return self._refine_with_zhipu(prompt)
+            elif self.llm_type == "nvidia":
+                return self._refine_with_nvidia(prompt)
             else:
                 logger.error(f"不支持的LLM类型: {self.llm_type}")
                 return prompt
@@ -589,220 +594,92 @@ class LLMIntegrationAdapter:
 
     def _refine_with_gemini(self, prompt: str) -> str:
         """使用Gemini进行润色"""
-        import requests
-        from config.config import GEMINI_API_KEY, GEMINI_MODEL_NAME
+        from llm_integration.gemini_integration import refine_markdown_with_gemini
+        from config.config import GEMINI_API_KEY
 
         try:
-            # 使用指定的代理URL
-            base_url = "https://api-proxy.me/gemini"
-            api_url = f"{base_url.rstrip('/')}/v1beta/models/{GEMINI_MODEL_NAME}:generateContent"
-
-            headers = {
-                "Content-Type": "application/json",
-                "x-goog-api-key": GEMINI_API_KEY
-            }
-
-            payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            {
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": 0.3,
-                    "maxOutputTokens": 50000
-                }
-            }
-
-            logger.info(
-                f"正在调用 Gemini API 进行润色，模型: {GEMINI_MODEL_NAME}，端点: {api_url}")
-
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=payload,
-                timeout=60,
-                proxies=proxies if use_proxies else None  # 根据条件使用代理
+            # 调用Gemini集成模块的润色功能
+            refined_content = refine_markdown_with_gemini(
+                prompt=prompt,
+                api_key=GEMINI_API_KEY
             )
-
-            response.raise_for_status()
-            result = response.json()
-
-            logger.info(f"Gemini API 润色响应状态码: {response.status_code}")
-
-            if "candidates" in result and len(result["candidates"]) > 0:
-                candidate = result["candidates"][0]
-                if "content" in candidate and "parts" in candidate["content"]:
-                    content = candidate["content"]["parts"][0].get("text", "")
-                    # 清理markdown代码块标记
-                    return self._clean_markdown_blocks(content)
-
-            return "Gemini润色失败：无法解析响应"
-
+            logger.info("Gemini润色完成")
+            return refined_content
         except Exception as e:
             logger.error(f"Gemini润色失败: {e}")
             return f"Gemini润色失败: {e}"
 
     def _refine_with_deepseek(self, prompt: str) -> str:
         """使用DeepSeek进行润色"""
-        import requests
-        from config.config import DEEPSEEK_API_KEY, DEEPSEEK_API_URL, DEEPSEEK_MODEL_ID
+        from llm_integration.deepseek_integration import refine_markdown_with_deepseek
+        from config.config import DEEPSEEK_API_KEY
 
         try:
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
-            }
-
-            payload = {
-                "model": DEEPSEEK_MODEL_ID,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.3,
-                "max_tokens": 50000
-            }
-
-            logger.info(
-                f"正在调用 DeepSeek API 进行润色，模型: {DEEPSEEK_MODEL_ID}，端点: {DEEPSEEK_API_URL}")
-
-            response = requests.post(
-                DEEPSEEK_API_URL,
-                headers=headers,
-                json=payload,
-                timeout=60,
-                proxies=proxies if use_proxies else None  # 根据条件使用代理
+            # 调用DeepSeek集成模块的润色功能
+            refined_content = refine_markdown_with_deepseek(
+                prompt=prompt,
+                api_key=DEEPSEEK_API_KEY
             )
-
-            response.raise_for_status()
-            result = response.json()
-
-            logger.info(f"DeepSeek API 润色响应状态码: {response.status_code}")
-
-            if "choices" in result and len(result["choices"]) > 0:
-                content = result["choices"][0]["message"]["content"]
-                # 清理markdown代码块标记
-                return self._clean_markdown_blocks(content)
-
-            return "DeepSeek润色失败：无法解析响应"
-
+            logger.info("DeepSeek润色完成")
+            return refined_content
         except Exception as e:
             logger.error(f"DeepSeek润色失败: {e}")
             return f"DeepSeek润色失败: {e}"
 
     def _refine_with_hunyuan(self, prompt: str) -> str:
         """使用混元进行润色"""
-        import requests
+        from llm_integration.hunyuan_integration import refine_markdown_with_hunyuan
         from config.config import HUNYUAN_API_KEY
 
         try:
-            # 混元API配置 - 使用正确的API端点
-            api_url = "https://api.hunyuan.cloud.tencent.com/v1/chat/completions"
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {HUNYUAN_API_KEY}"
-            }
-
-            payload = {
-                "model": "hunyuan-lite",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                "temperature": 0.3,
-                "max_tokens": 50000
-            }
-
-            logger.info(f"正在调用混元 API 进行润色，端点: {api_url}")
-
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=payload,
-                timeout=60,
-                proxies=proxies if use_proxies else None  # 根据条件使用代理
+            # 调用混元集成模块的润色功能
+            refined_content = refine_markdown_with_hunyuan(
+                prompt=prompt,
+                api_key=HUNYUAN_API_KEY
             )
-
-            response.raise_for_status()
-            result = response.json()
-
-            logger.info(f"混元 API 润色响应状态码: {response.status_code}")
-
-            if "choices" in result and len(result["choices"]) > 0:
-                content = result["choices"][0]["message"]["content"]
-                # 清理markdown代码块标记
-                return self._clean_markdown_blocks(content)
-
-            return "混元润色失败：无法解析响应"
-
+            logger.info("混元润色完成")
+            return refined_content
         except Exception as e:
             logger.error(f"混元润色失败: {e}")
             return f"混元润色失败: {e}"
 
     def _refine_with_zhipu(self, prompt: str) -> str:
         """使用智谱AI进行润色"""
-        import requests
-        from config.config import ZHIPU_API_KEY, ZHIPU_TIMEOUT
+        from llm_integration.zhipu_integration import refine_markdown_with_zhipu
+        from config.config import ZHIPU_API_KEY
 
         try:
-            # 智谱AI API配置
-            api_url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-            model_id = "glm-4.5-flash"  # 使用智谱AI的模型
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {ZHIPU_API_KEY}"
-            }
-
-            payload = {
-                "model": model_id,
-                "messages": [
-                    {"role": "system", "content": "你是一个专业的科技新闻编辑，擅长对科技日报内容进行去重、融合和润色。"},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.3,
-                "max_tokens": 50000
-            }
-
-            logger.info(f"正在调用智谱AI API 进行润色，模型: {model_id}，端点: {api_url}")
-
-            response = requests.post(
-                api_url,
-                headers=headers,
-                json=payload,
-                timeout=ZHIPU_TIMEOUT,  # 使用配置文件中的超时设置
-                proxies=proxies if use_proxies else None  # 根据条件使用代理
+            # 调用智谱AI集成模块的润色功能
+            refined_content = refine_markdown_with_zhipu(
+                prompt=prompt,
+                api_key=ZHIPU_API_KEY
             )
-
-            response.raise_for_status()
-            result = response.json()
-
-            logger.info(f"智谱AI API 润色响应状态码: {response.status_code}")
-
-            if "choices" in result and len(result["choices"]) > 0:
-                content = result["choices"][0]["message"]["content"]
-                # 清理markdown代码块标记
-                return self._clean_markdown_blocks(content)
-
-            return "智谱AI润色失败：无法解析响应"
-
+            logger.info("智谱AI润色完成")
+            return refined_content
         except Exception as e:
             logger.error(f"智谱AI润色失败: {e}")
             return f"智谱AI润色失败: {e}"
 
+    def _refine_with_nvidia(self, prompt: str) -> str:
+        """使用NVIDIA进行润色"""
+        from llm_integration.nvidia_integration import refine_markdown_with_nvidia
+        from config.config import NVIDIA_API_KEY
+        
+        try:
+            # 调用NVIDIA集成模块的润色功能
+            refined_content = refine_markdown_with_nvidia(
+                prompt=prompt,
+                api_key=NVIDIA_API_KEY
+            )
+            logger.info("NVIDIA润色完成")
+            return refined_content
+        except Exception as e:
+            logger.error(f"NVIDIA润色失败: {e}")
+            return f"NVIDIA润色失败: {e}"
+
     def _clean_markdown_blocks(self, content: str) -> str:
         """
-        清理markdown代码块标记和确认语句
+        清理编码代码块标记和确认语句
 
         Args:
             content: 原始内容
@@ -813,9 +690,9 @@ class LLMIntegrationAdapter:
         if not content:
             return content
 
-        # 移除开头的 ```markdown
-        if content.startswith('```markdown'):
-            content = content[12:]  # 移除 ```markdown
+        # 移除开头的 ```编码
+        if content.startswith('``编码'):
+            content = content[12:]  # 移除 ``编码
 
         # 移除开头的 ```
         if content.startswith('```'):
@@ -843,7 +720,7 @@ class LLMIntegrationAdapter:
                 "我将按照您的要求",
                 "对提供的科技日报内容进行",
                 "深度去重、融合、润色和结构优化",
-                "并按照指定的 Markdown 格式输出",
+                "并按照指定的 编码 格式输出",
                 "好的，我明白了",
                 "我来帮您",
                 "我将为您",
@@ -852,15 +729,15 @@ class LLMIntegrationAdapter:
             ]):
                 continue
 
-            # 如果遇到markdown标题，开始保留内容
+            # 如果遇到编码标题，开始保留内容
             if line.strip().startswith('#') or line.strip().startswith('##'):
                 skip_until_markdown = False
 
-            # 如果还没有遇到markdown标题，跳过空行
+            # 如果还没有遇到编码标题，跳过空行
             if skip_until_markdown and not line.strip():
                 continue
 
-            # 如果遇到markdown标题，标记开始保留内容
+            # 如果遇到编码标题，标记开始保留内容
             if line.strip().startswith('#') or line.strip().startswith('##'):
                 skip_until_markdown = True
 
@@ -871,13 +748,13 @@ class LLMIntegrationAdapter:
 
     def _json_to_markdown(self, json_data: List[dict]) -> str:
         """
-        将JSON格式的结果转换为markdown格式
+        将JSON格式的结果转换为编码格式
 
         Args:
             json_data: JSON格式的数据
 
         Returns:
-            str: markdown格式的内容
+            str: 编码格式的内容
         """
         markdown_lines = []
         markdown_lines.append(f"# 科技日报 - {self.today}")
@@ -908,7 +785,7 @@ def create_llm_adapter(llm_type: str = "gemini") -> LLMIntegrationAdapter:
     Returns:
         LLMIntegrationAdapter: LLM适配器实例
     """
-    from config.config import GEMINI_API_KEY, DEEPSEEK_API_KEY, HUNYUAN_API_KEY, ZHIPU_API_KEY
+    from config.config import GEMINI_API_KEY, DEEPSEEK_API_KEY, HUNYUAN_API_KEY, ZHIPU_API_KEY, NVIDIA_API_KEY
 
     if llm_type == "gemini":
         return LLMIntegrationAdapter(
@@ -929,6 +806,11 @@ def create_llm_adapter(llm_type: str = "gemini") -> LLMIntegrationAdapter:
         return LLMIntegrationAdapter(
             llm_type="zhipu",
             api_key=ZHIPU_API_KEY
+        )
+    elif llm_type == "nvidia":
+        return LLMIntegrationAdapter(
+            llm_type="nvidia",
+            api_key=NVIDIA_API_KEY
         )
     else:
         raise ValueError(f"不支持的LLM类型: {llm_type}")

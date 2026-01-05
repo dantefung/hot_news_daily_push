@@ -408,3 +408,147 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def refine_markdown_with_hunyuan(prompt: str, api_key: str = None, model_name: str = "hunyuan-lite", max_retries: int = 3) -> str:
+    """
+    使用腾讯混元API对内容进行润色
+    
+    Args:
+        prompt: 润色提示词
+        api_key: 混元API密钥
+        model_name: 模型名称
+        max_retries: 最大重试次数
+    
+    Returns:
+        str: 润色后的内容
+    """
+    from config.config import HUNYUAN_API_KEY
+    from langchain_core.prompts import PromptTemplate
+    from langchain_openai import ChatOpenAI
+    from llm_integration.compat import LLMChain
+    
+    # 优先使用传入的API密钥，否则使用配置文件中的
+    if not api_key:
+        api_key = HUNYUAN_API_KEY
+    
+    if not api_key:
+        logger.error("未配置HUNYUAN_API_KEY，请先设置API密钥")
+        return prompt
+
+    retry_count = 0
+    while retry_count < max_retries:
+        try:
+            # 创建LLM实例
+            llm = ChatOpenAI(
+                model=model_name,
+                temperature=0.3,
+                api_key=api_key,
+                max_tokens=50000,
+                base_url="https://api.hunyuan.cloud.tencent.com/v1"
+            )
+            
+            # 创建提示模板
+            prompt_template = PromptTemplate(
+                input_variables=["prompt"],
+                template="{prompt}"
+            )
+            
+            # 使用兼容层的 LLMChain（旧风格 API）
+            chain = LLMChain(llm=llm, prompt=prompt_template)
+            
+            # 调用模型
+            response = chain.invoke({"prompt": prompt})
+            refined_content = response.get("text", "").strip()
+            
+            logger.info(f"混元API润色成功，内容长度: {len(refined_content)} 字符")
+            
+            # 清理markdown代码块标记和确认语句
+            cleaned_content = _clean_markdown_blocks_hunyuan(refined_content)
+            
+            return cleaned_content
+            
+        except Exception as e:
+            logger.error(f"调用混元API进行润色失败: {str(e)}")
+            retry_count += 1
+            if retry_count < max_retries:
+                logger.warning(f"5秒后重试 ({retry_count}/{max_retries})...")
+                time.sleep(5)
+            else:
+                break
+    
+    logger.error(f"混元API润色失败，已达到最大重试次数 {max_retries}")
+    return prompt
+
+
+def _clean_markdown_blocks_hunyuan(content: str) -> str:
+    """
+    清理代码块标记和确认语句
+
+    Args:
+        content: 原始内容
+
+    Returns:
+        str: 清理后的内容
+    """
+    if not content:
+        return content
+
+    # 移除开头的 ``````
+    if content.startswith('``````'):
+        content = content[6:]  # 移除 ``````
+
+    # 移除开头的 ```
+    if content.startswith('```'):
+        content = content[3:]
+
+    # 移除结尾的 ```
+    if content.endswith('```'):
+        content = content[:-3]
+
+    # 移除开头的换行符
+    content = content.lstrip('\n')
+
+    # 移除结尾的换行符
+    content = content.rstrip('\n')
+
+    # 清理确认语句和无关内容
+    lines = content.split('\n')
+    cleaned_lines = []
+    skip_until_markdown = False
+
+    for line in lines:
+        # 跳过确认语句
+        if any(phrase in line for phrase in [
+            "好的，收到！",
+            "我将按照您的要求",
+            "对提供的科技日报内容进行",
+            "深度去重、融合、润色和结构优化",
+            "并按照指定的 Markdown 格式输出",
+            "好的，我明白了",
+            "我来帮您",
+            "我将为您",
+            "以下是",
+            "请查看以下内容",
+            "已按要求",
+            "已完成",
+            "根据您的要求"
+        ]):
+            continue
+
+        # 如果遇到代码块标题，开始保留内容
+        if line.strip().startswith('``'):
+            skip_until_markdown = False
+
+        # 如果还没有遇到代码块标题，跳过空行
+        if skip_until_markdown and not line.strip():
+            continue
+
+        # 如果遇到代码块标题，标记开始保留内容
+        if line.strip().startswith('``'):
+            skip_until_markdown = True
+
+        if skip_until_markdown or line.strip():
+            cleaned_lines.append(line)
+
+    return '\n'.join(cleaned_lines)
