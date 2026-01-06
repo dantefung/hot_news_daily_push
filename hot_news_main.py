@@ -41,6 +41,7 @@ from llm_integration.deepseek_integration import summarize_with_deepseek
 from llm_integration.gemini_integration import summarize_with_gemini
 from llm_integration.hunyuan_integration import summarize_with_hunyuan
 from llm_integration.zhipu_integration import summarize_with_zhipu
+from llm_integration.nvidia_integration import summarize_with_nvidia
 
 # 导入通知模块
 from notification.webhook_sender import notify, send_to_webhook
@@ -109,6 +110,11 @@ def safe_main():
             config_errors.append("选择了智谱清言总结模型但未提供API Key")
         else:
             logger.info("使用智谱清言模型进行总结")
+    elif summary_model == 'nvidia':
+        if not os.getenv('NVIDIA_API_KEY'):
+            config_errors.append("选择了NVIDIA总结模型但未提供API Key")
+        else:
+            logger.info("使用NVIDIA模型进行总结")
     else:
         config_errors.append(f"不支持的总结模型: {summary_model}")
 
@@ -127,7 +133,8 @@ def safe_main():
                 "有DEEPSEEK_API_KEY": bool(deepseek_key),
                 "有GEMINI_API_KEY": bool(gemini_key),
                 "有HUNYUAN_API_KEY": bool(hunyuan_key),
-                "有ZHIPU_API_KEY": bool(zhipu_key)
+                "有ZHIPU_API_KEY": bool(zhipu_key),
+                "有NVIDIA_API_KEY": bool(os.getenv("NVIDIA_API_KEY"))
             }
         }
         logger.error(f"配置错误: {error_details}")
@@ -433,6 +440,8 @@ def safe_main():
             summary = summarize_with_hunyuan(deduplicated_content, hunyuan_key, tech_only=tech_only)
         elif summary_model == 'zhipu':
             summary = summarize_with_zhipu(deduplicated_content, zhipu_key, tech_only=tech_only)
+        elif summary_model == 'nvidia':
+            summary = summarize_with_nvidia(deduplicated_content, os.getenv('NVIDIA_API_KEY'), tech_only=tech_only)
         else:  # 默认使用 DeepSeek
             summary = summarize_with_deepseek(deduplicated_content, deepseek_key,
                                               deepseek_url, model_id, tech_only=tech_only)

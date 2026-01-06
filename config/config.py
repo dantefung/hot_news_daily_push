@@ -40,7 +40,7 @@ CRAWL4AI_API_TOKEN = os.getenv('CRAWL4AI_API_TOKEN', 'sk-tuber0613kobezhao')
 CRAWL4AI_TIMEOUT = int(os.getenv('CRAWL4AI_TIMEOUT', '20'))
 CRAWL4AI_MAX_RETRIES = int(os.getenv('CRAWL4AI_MAX_RETRIES', '2'))
 
-# 总结模型选择 (支持: deepseek, gemini, hunyuan)
+# 总结模型选择 (支持: deepseek, gemini, hunyuan, zhipu, nvidia)
 SUMMARY_MODEL = os.getenv('SUMMARY_MODEL', 'gemini')
 GEMINI_MODEL_NAME = os.getenv('GEMINI_MODEL_NAME', 'gemini-2.0-flash')
 # https://generativelanguage.googleapis.com
